@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { tmpdir, platform } from 'node:os';
 import path from 'node:path';
 import { LocalSandbox, type ExecutionSandbox } from '../src/sandbox.js';
 import { createRepoTools } from '../src/index.js';
@@ -10,10 +10,11 @@ describe('execution sandbox', () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'wh-sandbox-'));
     const sandbox = new LocalSandbox({ env: { ALLOWED_VALUE: 'visible' } });
 
-    const result = await sandbox.execute({ command: 'printf "$ALLOWED_VALUE:$HOME"', repo, cwd: repo });
+    const command = platform() === 'win32' ? 'echo %ALLOWED_VALUE%:%HOME%' : 'printf "$ALLOWED_VALUE:$HOME"';
+    const result = await sandbox.execute({ command, repo, cwd: repo });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('visible:');
+    expect(result.stdout.trim()).toBe('visible:');
   });
 
   it('enforces timeout with structured result', async () => {

@@ -1,6 +1,20 @@
 import { execFile } from 'node:child_process';
+import { platform } from 'node:os';
 import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
+
+const isWindows = platform() === 'win32';
+
+function shellFor(command: string): { file: string; args: string[] } {
+  return isWindows
+    ? { file: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', command] }
+    : { file: 'bash', args: ['-c', command] };
+}
+
+function timeoutMessage(err: any, timeoutMs: number): string | undefined {
+  if (err?.killed || err?.signal === 'SIGTERM' || err?.code === 'ETIMEDOUT') return `Command timeout after ${timeoutMs}ms`;
+  return undefined;
+}
 
 export type SandboxMode = string;
 
@@ -61,16 +75,17 @@ export class LocalSandbox implements ExecutionSandbox {
     };
 
     try {
-      const { stdout, stderr } = await execFileAsync('bash', ['-c', request.command], {
+      const shell = shellFor(request.command);
+      const { stdout, stderr } = await execFileAsync(shell.file, shell.args, {
         cwd: request.cwd,
         timeout: timeoutMs,
         maxBuffer,
         env,
+        windowsHide: true,
       });
       return { ok: true, stdout, stderr, exitCode: 0, sandbox: sandboxMeta };
     } catch (err: any) {
-      const timedOut = err?.killed && err?.signal === 'SIGTERM';
-      const message = timedOut ? `Command timeout after ${timeoutMs}ms` : (err?.stderr?.slice?.(0, 500) ?? err?.message ?? 'Command failed');
+      const message = timeoutMessage(err, timeoutMs) ?? (err?.stderr?.slice?.(0, 500) ?? err?.message ?? 'Command failed');
       return {
         ok: false,
         stdout: err?.stdout ?? '',

@@ -1,10 +1,18 @@
 import { readFile, writeFile, readdir, realpath, lstat, mkdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
+import { platform } from 'node:os';
 import { promisify } from 'node:util';
 import { dirname, resolve, sep } from 'node:path';
 import type { ToolResult, TypedTool } from '@world-harness/core';
 import { LocalSandbox, type ExecutionSandbox } from './sandbox.js';
 const execFileAsync = promisify(execFile);
+const isWindows = platform() === 'win32';
+
+function shellFor(command: string): { file: string; args: string[] } {
+  return isWindows
+    ? { file: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', command] }
+    : { file: 'bash', args: ['-c', command] };
+}
 
 // ─── Path Safety ───────────────────────────────────────────────
 export function resolveInside(repo: string, target: string): string {
@@ -127,10 +135,12 @@ export const runTool: TypedTool<{ command: string; cwd?: string }, { stdout: str
   risks: ['execute'],
   async run(input) {
     try {
-      const { stdout, stderr } = await execFileAsync('bash', ['-c', input.command], {
+      const shell = shellFor(input.command);
+      const { stdout, stderr } = await execFileAsync(shell.file, shell.args, {
         cwd: input.cwd,
         timeout: 60000,
         maxBuffer: 1024 * 1024,
+        windowsHide: true,
       });
       return { ok: true, output: { stdout, stderr, exitCode: 0 }, evidence: [] };
     } catch (err: any) {

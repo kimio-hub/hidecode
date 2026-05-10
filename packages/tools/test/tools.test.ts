@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { tmpdir, platform } from 'node:os';
 import path from 'node:path';
 import { createRepoTools, patchTool, readTool, resolveInside, runTool } from '../src/index.js';
 
@@ -23,7 +23,7 @@ describe('local typed tools', () => {
     expect(patchResult.ok).toBe(false);
     expect(patchResult.evidence).toEqual([]);
 
-    const runResult = await runTool.run({ command: 'exit 7', cwd: dir });
+    const runResult = await runTool.run({ command: platform() === 'win32' ? 'cmd /c exit 7' : 'exit 7', cwd: dir });
     expect(runResult.ok).toBe(false);
     expect(runResult.evidence).toEqual([]);
     expect(runResult.output?.exitCode).toBe(7);
@@ -58,6 +58,8 @@ describe('local typed tools', () => {
   });
 
   it('rejects symlink escapes from repo-scoped file tools', async () => {
+    if (platform() === 'win32') return;
+
     const repo = await mkdtemp(path.join(tmpdir(), 'wh-repo-'));
     const outsideDir = await mkdtemp(path.join(tmpdir(), 'wh-outside-'));
     await writeFile(path.join(outsideDir, 'secret.txt'), 'secret');
