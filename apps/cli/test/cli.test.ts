@@ -4,14 +4,18 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const cliArgs = ['tsx', 'src/index.ts'];
+const cliArgs = [join(import.meta.dirname, '..', 'src', 'index.ts')];
+
+function runCli(args: string[]) {
+  return spawnSync(process.execPath, ['--import', 'tsx', ...cliArgs, ...args], {
+    cwd: join(import.meta.dirname, '..'),
+    encoding: 'utf8',
+  });
+}
 
 describe('cli package', () => {
   it('prints sandbox flags in run help', () => {
-    const result = spawnSync('pnpm', [...cliArgs, 'run', '--help'], {
-      cwd: join(import.meta.dirname, '..'),
-      encoding: 'utf8',
-    });
+    const result = runCli(['run', '--help']);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('--sandbox <mode>');
@@ -22,16 +26,12 @@ describe('cli package', () => {
 
   it('rejects unsupported sandbox modes before model execution', () => {
     const repo = mkdtempSync(join(tmpdir(), 'wh-cli-'));
-    const result = spawnSync('pnpm', [
-      ...cliArgs,
+    const result = runCli([
       'run',
       '--repo', repo,
       '--goal', 'noop',
       '--sandbox', 'docker',
-    ], {
-      cwd: join(import.meta.dirname, '..'),
-      encoding: 'utf8',
-    });
+    ]);
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('Unsupported sandbox mode: docker');
