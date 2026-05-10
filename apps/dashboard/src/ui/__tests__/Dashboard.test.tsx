@@ -13,6 +13,7 @@ describe('Dashboard', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
     expect(screen.getByText('Task Graph')).toBeInTheDocument();
     expect(screen.getByText('Tool Timeline')).toBeInTheDocument();
+    expect(screen.getAllByText('Replay Debug').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Evidence')).toBeInTheDocument();
     expect(screen.getByText('Policy / Risk')).toBeInTheDocument();
     expect(screen.getByText('Diff / Changes')).toBeInTheDocument();
@@ -23,7 +24,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('Mission Control')).toBeInTheDocument();
     expect(screen.getByText('Control')).toBeInTheDocument();
     expect(screen.getAllByText('Approvals').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Replay')).toBeInTheDocument();
+    expect(screen.getAllByText('Replay').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Agents')).toBeInTheDocument();
     expect(screen.getByText('Events')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
@@ -40,6 +41,17 @@ describe('Dashboard', () => {
     expect(screen.getByText('Policy decision: allow')).toBeInTheDocument();
     expect(screen.getByText('Approve')).toBeInTheDocument();
     expect(screen.getByText('Reject')).toBeInTheDocument();
+  });
+
+  it('renders read-only replay debugger items and future actions', () => {
+    render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
+    expect(screen.getAllByText('Replay Debug').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Task created')).toBeInTheDocument();
+    expect(screen.getAllByText('Tool result').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Save Eval')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replay' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Fork' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save Eval' })).toBeDisabled();
   });
 
   it('shows model name in header', () => {

@@ -1,11 +1,13 @@
 import type { TraceEvent, RunMeta } from '../data/mock';
 import { deriveApprovalQueue } from '../data/approvals';
+import { deriveReplaySteps } from '../data/replay';
 import TaskGraph from './components/TaskGraph';
 import ToolTimeline from './components/ToolTimeline';
 import EvidencePanel from './components/EvidencePanel';
 import PolicyPanel from './components/PolicyPanel';
 import DiffPanel from './components/DiffPanel';
 import ApprovalQueue from './components/ApprovalQueue';
+import ReplayDebugger from './components/ReplayDebugger';
 import Header from './components/Header';
 
 interface Props {
@@ -24,6 +26,7 @@ const navItems = [
 export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) {
   const toolEvents = events.filter(e => e.type.startsWith('tool.'));
   const approvalQueue = deriveApprovalQueue(events);
+  const replaySteps = deriveReplaySteps(events);
   const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
   const duration = formatDuration(events);
 
@@ -94,6 +97,12 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
           </Panel>
           <Panel title="Tool Timeline">
             <ToolTimeline events={events} />
+          </Panel>
+        </section>
+
+        <section style={{ minHeight: '320px' }}>
+          <Panel title="Replay Debug">
+            <ReplayDebugger steps={replaySteps} />
           </Panel>
         </section>
 
