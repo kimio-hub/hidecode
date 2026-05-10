@@ -10,7 +10,7 @@ describe('execution sandbox', () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'wh-sandbox-'));
     const sandbox = new LocalSandbox({ env: { ALLOWED_VALUE: 'visible' } });
 
-    const command = platform() === 'win32' ? 'echo %ALLOWED_VALUE%:%HOME%' : 'printf "$ALLOWED_VALUE:$HOME"';
+    const command = platform() === 'win32' ? 'node -e "process.stdout.write(process.env.ALLOWED_VALUE + \':\' + (process.env.HOME ?? \"\"))"' : 'printf "$ALLOWED_VALUE:$HOME"';
     const result = await sandbox.execute({ command, repo, cwd: repo });
 
     expect(result.exitCode).toBe(0);
