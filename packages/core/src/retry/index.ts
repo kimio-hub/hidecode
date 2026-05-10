@@ -10,7 +10,7 @@ export interface RetryConfig {
 }
 
 const DEFAULT_RETRYABLE = (error: unknown): boolean => {
-  const msg = String(error?.message ?? error ?? '').toLowerCase();
+  const msg = getErrorMessage(error).toLowerCase();
   // Retry on transient errors
   if (msg.includes('timeout') || msg.includes('econnreset') || msg.includes('econnrefused')) return true;
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')) return true;
@@ -23,7 +23,7 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   config: Partial<RetryConfig> = {},
 ): Promise<T> {
-  const opts: RetryConfig = {
+  const opts: Required<RetryConfig> = {
     maxAttempts: config.maxAttempts ?? 3,
     baseDelayMs: config.baseDelayMs ?? 1000,
     maxDelayMs: config.maxDelayMs ?? 30000,
@@ -48,12 +48,21 @@ export async function withRetry<T>(
 }
 
 export function classifyError(error: unknown): { retryable: boolean; category: string; message: string } {
-  const msg = String(error?.message ?? error ?? '');
-  if (msg.includes('429') || msg.includes('rate limit')) return { retryable: true, category: 'rate_limit', message: msg };
-  if (msg.includes('401') || msg.includes('invalid token')) return { retryable: false, category: 'auth', message: msg };
-  if (msg.includes('403')) return { retryable: false, category: 'forbidden', message: msg };
-  if (msg.includes('404') || msg.includes('model_not_found')) return { retryable: false, category: 'not_found', message: msg };
-  if (msg.includes('502') || msg.includes('503') || msg.includes('504')) return { retryable: true, category: 'upstream', message: msg };
-  if (msg.includes('timeout') || msg.includes('econnreset')) return { retryable: true, category: 'network', message: msg };
+  const msg = getErrorMessage(error);
+  const lower = msg.toLowerCase();
+  if (lower.includes('429') || lower.includes('rate limit')) return { retryable: true, category: 'rate_limit', message: msg };
+  if (lower.includes('401') || lower.includes('invalid token')) return { retryable: false, category: 'auth', message: msg };
+  if (lower.includes('403')) return { retryable: false, category: 'forbidden', message: msg };
+  if (lower.includes('404') || lower.includes('model_not_found')) return { retryable: false, category: 'not_found', message: msg };
+  if (lower.includes('502') || lower.includes('503') || lower.includes('504')) return { retryable: true, category: 'upstream', message: msg };
+  if (lower.includes('timeout') || lower.includes('econnreset')) return { retryable: true, category: 'network', message: msg };
   return { retryable: false, category: 'unknown', message: msg };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message?: unknown }).message ?? '');
+  }
+  return String(error ?? '');
 }

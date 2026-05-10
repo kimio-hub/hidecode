@@ -95,7 +95,7 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
           fontSize: '11px',
         }}>
           {summary && <div style={{ color: '#aaa', marginBottom: '6px' }}>{summary}</div>}
-          {data.input && (
+          {data.input !== undefined && (
             <div style={{
               background: '#0a0a12',
               borderRadius: '4px',
@@ -109,7 +109,7 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
               {JSON.stringify(data.input, null, 2)}
             </div>
           )}
-          {resultData?.stdout && (
+          {typeof resultData?.stdout === 'string' && (
             <div style={{
               background: '#0a0a12',
               borderRadius: '4px',

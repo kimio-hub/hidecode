@@ -5,7 +5,7 @@ import {
 } from '@world-harness/core';
 import type { ModelAdapter, Observation } from '@world-harness/models';
 import { decide } from '@world-harness/policy';
-import { mkdir, writeFile, cp, rm } from 'node:fs/promises';
+import { mkdir, writeFile, cp, rm, readFile, realpath as fsRealpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -82,6 +82,7 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
 
   const observations: Observation[] = [];
   let finalSummary = 'Task did not complete within budget.';
+  let blockedByApproval = false;
 
   while (!budget.isExceeded()) {
     const stepIndex = budget.getState().steps;
@@ -115,7 +116,7 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
 
     // ─── Final ───────────────────────────────────────────────
     if (modelStep.kind === 'final') {
-      finalSummary = modelStep.summary;
+      finalSummary = await verifyAcceptanceCriteria(opts.task, modelStep.summary);
       break;
     }
 
@@ -169,7 +170,14 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
 
     if (policyDecision.decision === 'ask') {
       await emit('approval.requested', { tool: toolReq.tool, reason: policyDecision.reason });
-      await emit('approval.resolved', { decision: 'approved' });
+      observations.push({
+        stepIndex,
+        toolName: toolReq.tool,
+        ok: false,
+        error: `Approval required: ${policyDecision.reason}`,
+      });
+      blockedByApproval = true;
+      continue;
     }
 
     // Auto-snapshot before write operations
@@ -182,7 +190,7 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
         snapshots.push(snapPath);
         await emit('snapshot.created', { snapshotId: snapId, path: snapPath });
       } catch (err: any) {
-        await emit('snapshot.failed', { error: err.message });
+        await emit('snapshot.failed', { error: err instanceof Error ? err.message : String(err) });
       }
     }
 
@@ -203,7 +211,7 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
         { maxAttempts: 2, baseDelayMs: 500 },
       );
     } catch (err: any) {
-      result = { ok: false, error: err.message };
+      result = { ok: false,        error: err instanceof Error ? err.message : String(err)};
     }
 
     await emit('tool.finished', { tool: toolReq.tool, ok: result.ok, error: result.error, evidence: result.evidence });
@@ -230,7 +238,39 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
     });
   }
 
-  return finish(true, finalSummary, budget.getState().steps, startTime, artifacts, runId, taskId, opts.task, budget, snapshots);
+  if (blockedByApproval && !finalSummary.startsWith('Acceptance criteria not satisfied:')) {
+    finalSummary = 'Task requires explicit approval before it can complete.';
+  }
+
+  const completed = finalSummary !== 'Task did not complete within budget.' && !finalSummary.startsWith('Acceptance criteria not satisfied:') && !finalSummary.startsWith('Acceptance criteria not verifiable:') && !blockedByApproval;
+  if (!completed) {
+    const reason = budget.getState().exceededReason;
+    if (reason) finalSummary = `Task did not complete: ${reason}.`;
+  }
+  return finish(completed, finalSummary, budget.getState().steps, startTime, artifacts, runId, taskId, opts.task, budget, snapshots);
+}
+
+async function verifyAcceptanceCriteria(task: Task, summary: string): Promise<string> {
+  const repoReal = await fsRealpath(task.repo);
+  for (const criterion of task.acceptanceCriteria ?? []) {
+    const match = criterion.match(/^(.+?)\s+contains\s+(.+)$/i);
+    if (!match) return `Acceptance criteria not verifiable: ${criterion}`;
+    const relativePath = match[1].trim();
+    const expected = match[2].trim();
+    const filePath = path.resolve(task.repo, relativePath);
+    if (!filePath.startsWith(path.resolve(task.repo) + path.sep) && filePath !== path.resolve(task.repo)) {
+      return `Acceptance criteria not satisfied: ${criterion}`;
+    }
+    try {
+      const fileReal = await fsRealpath(filePath);
+      if (!fileReal.startsWith(repoReal + path.sep) && fileReal !== repoReal) return `Acceptance criteria not satisfied: ${criterion}`;
+      const content = await readFile(filePath, 'utf8');
+      if (!content.includes(expected)) return `Acceptance criteria not satisfied: ${criterion}`;
+    } catch {
+      return `Acceptance criteria not satisfied: ${criterion}`;
+    }
+  }
+  return summary;
 }
 
 async function finish(

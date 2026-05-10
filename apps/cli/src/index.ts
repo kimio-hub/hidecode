@@ -5,7 +5,7 @@ import path from 'node:path';
 import { HARNESS_VERSION, TaskSchema } from '@world-harness/core';
 import { ScriptedModelAdapter, OpenAIModelAdapter } from '@world-harness/models';
 import { runSingleAgentTask } from '@world-harness/orchestrator';
-import { localTools } from '@world-harness/tools';
+import { createRepoTools } from '@world-harness/tools';
 import { defaultPolicy } from '@world-harness/policy';
 
 const program = new Command();
@@ -56,9 +56,9 @@ program.command('run')
     const result = await runSingleAgentTask({
       task,
       model,
-      tools: localTools,
+      tools: createRepoTools(task.repo),
       policy: defaultPolicy,
-      maxSteps: parseInt(opts.maxSteps),
+      budget: { maxSteps: parseInt(opts.maxSteps) },
       onEvent: (evt: any) => {
         const ts = new Date(evt.timestamp).toLocaleTimeString();
         const info = evt.data?.tool ?? evt.data?.summary ?? evt.data?.reason ?? '';
@@ -92,7 +92,7 @@ program.command('smoke')
       { kind: 'final', summary: 'smoke completed: runtime emitted trace and report' },
     ]);
 
-    const result = await runSingleAgentTask({ task, model, tools: localTools });
+    const result = await runSingleAgentTask({ task, model, tools: createRepoTools(task.repo) });
     console.log(`[smoke] ${result.ok ? 'PASS' : 'FAIL'} — ${result.summary}`);
     process.exit(result.ok ? 0 : 1);
   });
@@ -100,7 +100,7 @@ program.command('smoke')
 // ─── replay: deterministic replay from trace ───────────────────
 program.command('replay').argument('<trace>').action(async (tracePath) => {
   const content = await readFile(tracePath, 'utf8');
-  const events = content.split('\n').filter(Boolean).map(JSON.parse);
+  const events = content.split('\n').filter(Boolean).map(line => JSON.parse(line));
   console.log(`Replaying ${events.length} events from ${tracePath}`);
   for (const evt of events) {
     console.log(`  [${evt.type}] ${JSON.stringify(evt.data).slice(0, 100)}`);

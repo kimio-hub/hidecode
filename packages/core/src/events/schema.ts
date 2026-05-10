@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const TraceEventTypeSchema = z.enum([
   'task.created', 'context.built', 'model.requested', 'model.completed', 'tool.requested',
   'policy.decided', 'approval.requested', 'approval.resolved', 'tool.started', 'tool.finished',
-  'file.changed', 'verification.started', 'verification.finished', 'task.completed', 'task.failed'
+  'file.changed', 'verification.started', 'verification.finished', 'task.completed', 'task.failed',
+  'plan.created', 'security.finding', 'snapshot.created', 'snapshot.failed'
 ]);
 
 export const TraceEventSchema = z.object({

@@ -206,8 +206,8 @@ export class OpenAIModelAdapter implements ModelAdapter {
 // ─── Factory ───────────────────────────────────────────────────
 export function createModelAdapter(config: { type: 'scripted'; script: ModelStep[] }): ScriptedModelAdapter;
 export function createModelAdapter(config: { type: 'openai' } & OpenAIAdapterConfig): OpenAIModelAdapter;
-export function createModelAdapter(config: { type: string } & Record<string, unknown>): ModelAdapter {
-  if (config.type === 'scripted') return new ScriptedModelAdapter((config as { script: ModelStep[] }).script);
-  if (config.type === 'openai') return new OpenAIModelAdapter(config as unknown as OpenAIAdapterConfig);
-  throw new Error(`Unknown model adapter type: ${config.type}`);
+export function createModelAdapter(config: ({ type: 'scripted'; script: ModelStep[] } | ({ type: 'openai' } & OpenAIAdapterConfig))): ModelAdapter {
+  if (config.type === 'scripted') return new ScriptedModelAdapter(config.script);
+  if (config.type === 'openai') return new OpenAIModelAdapter(config);
+  throw new Error('Unknown model adapter type');
 }
