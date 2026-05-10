@@ -22,7 +22,7 @@ describe('Dashboard', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
     expect(screen.getByText('Mission Control')).toBeInTheDocument();
     expect(screen.getByText('Control')).toBeInTheDocument();
-    expect(screen.getByText('Approvals')).toBeInTheDocument();
+    expect(screen.getAllByText('Approvals').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Replay')).toBeInTheDocument();
     expect(screen.getByText('Agents')).toBeInTheDocument();
     expect(screen.getByText('Events')).toBeInTheDocument();
@@ -32,6 +32,14 @@ describe('Dashboard', () => {
     expect(screen.getByText('Command Dock')).toBeInTheDocument();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
     expect(screen.getByText('Ask Harness')).toBeInTheDocument();
+  });
+
+  it('renders read-only approval queue items', () => {
+    render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
+    expect(screen.getByText('Approval Queue')).toBeInTheDocument();
+    expect(screen.getByText('Policy decision: allow')).toBeInTheDocument();
+    expect(screen.getByText('Approve')).toBeInTheDocument();
+    expect(screen.getByText('Reject')).toBeInTheDocument();
   });
 
   it('shows model name in header', () => {

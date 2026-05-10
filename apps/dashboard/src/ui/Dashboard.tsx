@@ -1,9 +1,11 @@
 import type { TraceEvent, RunMeta } from '../data/mock';
+import { deriveApprovalQueue } from '../data/approvals';
 import TaskGraph from './components/TaskGraph';
 import ToolTimeline from './components/ToolTimeline';
 import EvidencePanel from './components/EvidencePanel';
 import PolicyPanel from './components/PolicyPanel';
 import DiffPanel from './components/DiffPanel';
+import ApprovalQueue from './components/ApprovalQueue';
 import Header from './components/Header';
 
 interface Props {
@@ -21,6 +23,7 @@ const navItems = [
 
 export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) {
   const toolEvents = events.filter(e => e.type.startsWith('tool.'));
+  const approvalQueue = deriveApprovalQueue(events);
   const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
   const duration = formatDuration(events);
 
@@ -77,10 +80,11 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
       </aside>
 
       <main style={{ gridArea: 'main', overflow: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(110px, 1fr))', gap: '10px' }}>
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(110px, 1fr))', gap: '10px' }}>
           <MetricCard label="Events" value={String(events.length)} tone="#93c5fd" />
           <MetricCard label="Tools" value={String(toolEvents.length)} tone="#a78bfa" />
           <MetricCard label="Risk" value={riskEvents.length > 0 ? `${riskEvents.length} signals` : 'Clear'} tone={riskEvents.length > 0 ? '#fbbf24' : '#4ade80'} />
+          <MetricCard label="Approvals" value={String(approvalQueue.length)} tone={approvalQueue.length > 0 ? '#facc15' : '#4ade80'} />
           <MetricCard label="Duration" value={duration} tone="#f0abfc" />
         </section>
 
@@ -121,6 +125,9 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
       </main>
 
       <aside style={{ gridArea: 'inspector', borderLeft: '1px solid #1e1e2e', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', background: 'rgba(15, 15, 23, 0.72)' }}>
+        <Panel title="Approval Queue">
+          <ApprovalQueue items={approvalQueue} />
+        </Panel>
         <Panel title="Evidence">
           <EvidencePanel events={events} />
         </Panel>
