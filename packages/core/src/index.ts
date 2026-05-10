@@ -12,4 +12,7 @@ export * from './policy/schema.js';
 export * from './policy/types.js';
 export * from './changes/schema.js';
 export * from './changes/types.js';
+export * from './security/scanner.js';
+export * from './budget/tracker.js';
+export * from './retry/index.js';
 export const HARNESS_VERSION = '0.1.0';

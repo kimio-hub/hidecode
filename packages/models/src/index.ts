@@ -149,6 +149,58 @@ export class OpenAIModelAdapter implements ModelAdapter {
     // Fallback: treat as final answer
     return { kind: 'final', summary: content };
   }
+
+  // ─── Streaming ───────────────────────────────────────────────
+  async *stream(task: Task, observations: Observation[]): AsyncIterable<string> {
+    const messages = this.buildMessages(task, observations);
+
+    const res = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        messages,
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature,
+        stream: true,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Model API error ${res.status}: ${text.slice(0, 200)}`);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') return;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) yield content;
+          } catch { /* skip malformed chunks */ }
+        }
+      }
+    }
+  }
 }
 
 // ─── Factory ───────────────────────────────────────────────────

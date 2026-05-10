@@ -1,8 +1,13 @@
-import { HARNESS_VERSION, JsonlEventStore, event, runArtifactLayout, type Task, type TypedTool, type Policy } from '@world-harness/core';
+import {
+  HARNESS_VERSION, JsonlEventStore, runArtifactLayout,
+  BudgetTracker, withRetry, scanToolInput, scanText,
+  type Task, type TypedTool, type Policy, type BudgetConfig,
+} from '@world-harness/core';
 import type { ModelAdapter, Observation } from '@world-harness/models';
 import { decide } from '@world-harness/policy';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, cp, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 
 // ─── Types ─────────────────────────────────────────────────────
 export type OrchestratorOptions = {
@@ -10,8 +15,22 @@ export type OrchestratorOptions = {
   model: ModelAdapter;
   tools: TypedTool[];
   policy?: Policy;
-  maxSteps?: number;
-  onEvent?: (evt: unknown) => void;
+  budget?: BudgetConfig;
+  onEvent?: (evt: HarnessEvent) => void;
+  /** Enable auto-snapshot before risky operations */
+  autoSnapshot?: boolean;
+  /** Enable security scanning of tool I/O */
+  securityScan?: boolean;
+};
+
+export type HarnessEvent = {
+  eventId: string;
+  runId: string;
+  taskId: string;
+  type: string;
+  timestamp: string;
+  actor: string;
+  data: Record<string, unknown>;
 };
 
 export type OrchestratorResult = {
@@ -21,7 +40,18 @@ export type OrchestratorResult = {
   tracePath: string;
   reportPath: string;
   durationMs: number;
+  budget: ReturnType<BudgetTracker['getState']>;
+  snapshots: string[];
 };
+
+// ─── Subtask DAG ───────────────────────────────────────────────
+interface Subtask {
+  id: string;
+  goal: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  dependencies: string[];
+  result?: string;
+}
 
 // ─── ReAct Orchestrator ────────────────────────────────────────
 export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<OrchestratorResult> {
@@ -30,13 +60,15 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
   const taskId = opts.task.id ?? `task-${startTime}`;
   const artifacts = runArtifactLayout(opts.task.repo, runId);
   const trace = new JsonlEventStore(artifacts.trace);
+  const budget = new BudgetTracker(opts.budget ?? { maxSteps: 20 });
+  const snapshots: string[] = [];
+  const subtasks: Subtask[] = [];
 
   const emit = async (type: string, data: Record<string, unknown> = {}) => {
-    const evt = {
+    const evt: HarnessEvent = {
       eventId: randomUUID(),
-      runId,
-      taskId,
-      type: type as any,
+      runId, taskId,
+      type,
       timestamp: new Date().toISOString(),
       actor: 'orchestrator',
       data,
@@ -46,72 +78,151 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
   };
 
   await mkdir(artifacts.root, { recursive: true });
-  await emit('task.created', { goal: opts.task.goal, mode: opts.task.mode ?? 'plan' });
+  await emit('task.created', { goal: opts.task.goal, mode: opts.task.mode ?? 'plan', budget: budget.formatSummary() });
 
   const observations: Observation[] = [];
-  const maxSteps = opts.maxSteps ?? 20;
-  let finalSummary = 'Task did not complete within step budget.';
+  let finalSummary = 'Task did not complete within budget.';
 
-  for (let step = 0; step < maxSteps; step++) {
-    await emit('model.requested', { step });
+  while (!budget.isExceeded()) {
+    const stepIndex = budget.getState().steps;
+    budget.recordStep();
+    await emit('model.requested', { step: stepIndex, budget: budget.formatSummary() });
 
+    // ─── Call model with retry ───────────────────────────────
     let modelStep;
     try {
-      modelStep = await opts.model.next(opts.task, observations);
+      modelStep = await withRetry(
+        () => opts.model.next(opts.task, observations),
+        { maxAttempts: 3, baseDelayMs: 1000 },
+      );
     } catch (err: any) {
-      await emit('task.failed', { reason: `Model error: ${err.message}` });
-      return finish(false, `Model error at step ${step}: ${err.message}`, step, startTime, artifacts, runId, taskId, opts.task);
+      await emit('task.failed', { reason: `Model error: ${err.message}`, budget: budget.formatSummary() });
+      return finish(false, `Model error at step ${stepIndex}: ${err.message}`, stepIndex, startTime, artifacts, runId, taskId, opts.task, budget, snapshots);
     }
 
-    await emit('model.completed', { step, kind: modelStep.kind, summary: 'summary' in modelStep ? modelStep.summary : undefined });
+    // Track token usage if model provides it
+    if ('usage' in modelStep && modelStep.usage) {
+      const usage = modelStep.usage as { input_tokens?: number; output_tokens?: number };
+      budget.recordModelUsage(usage.input_tokens ?? 0, usage.output_tokens ?? 0);
+    }
 
+    await emit('model.completed', {
+      step: stepIndex,
+      kind: modelStep.kind,
+      summary: 'summary' in modelStep ? modelStep.summary : undefined,
+      budget: budget.formatSummary(),
+    });
+
+    // ─── Final ───────────────────────────────────────────────
     if (modelStep.kind === 'final') {
       finalSummary = modelStep.summary;
       break;
     }
 
+    // ─── Plan / Subtask Decomposition ────────────────────────
     if (modelStep.kind === 'plan') {
-      await emit('plan.created', { subtasks: modelStep.subtasks, step });
-      observations.push({ stepIndex: step, ok: true, output: `Plan created with ${modelStep.subtasks.length} subtasks` });
+      const newSubtasks: Subtask[] = modelStep.subtasks.map((goal, i) => ({
+        id: `sub-${stepIndex}-${i}`,
+        goal,
+        status: 'pending' as const,
+        dependencies: [],
+      }));
+      subtasks.push(...newSubtasks);
+      await emit('plan.created', { subtasks: newSubtasks.map(s => ({ id: s.id, goal: s.goal })), total: subtasks.length });
+      observations.push({ stepIndex, ok: true, output: `Plan created: ${newSubtasks.length} subtasks. Execute them one by one.` });
       continue;
     }
 
-    // Tool execution
+    // ─── Tool Execution ──────────────────────────────────────
     const toolReq = modelStep.request;
     await emit('tool.requested', { tool: toolReq.tool, input: toolReq.input, reasoning: modelStep.reasoning });
+
+    // Security scan
+    if (opts.securityScan !== false) {
+      const scanResult = scanToolInput(toolReq.tool, toolReq.input as Record<string, unknown>);
+      if (!scanResult.clean) {
+        await emit('security.finding', {
+          tool: toolReq.tool,
+          findings: scanResult.findings,
+        });
+        const critical = scanResult.findings.filter(f => f.severity === 'critical');
+        if (critical.length > 0) {
+          observations.push({
+            stepIndex,
+            toolName: toolReq.tool,
+            ok: false,
+            error: `Security block: ${critical.map(f => f.message).join('; ')}`,
+          });
+          continue;
+        }
+      }
+    }
 
     // Policy check
     const policyDecision = decide(opts.policy, toolReq);
     await emit('policy.decided', { decision: policyDecision.decision, reason: policyDecision.reason, matchedRule: policyDecision.matchedRule });
 
     if (policyDecision.decision === 'deny') {
-      observations.push({ stepIndex: step, toolName: toolReq.tool, ok: false, error: `Denied: ${policyDecision.reason}` });
+      observations.push({ stepIndex, toolName: toolReq.tool, ok: false, error: `Denied: ${policyDecision.reason}` });
       continue;
     }
 
     if (policyDecision.decision === 'ask') {
       await emit('approval.requested', { tool: toolReq.tool, reason: policyDecision.reason });
-      // Auto-approve in MVP (real impl would pause for user input)
       await emit('approval.resolved', { decision: 'approved' });
+    }
+
+    // Auto-snapshot before write operations
+    if (opts.autoSnapshot && (toolReq.risks?.includes('write') || toolReq.risks?.includes('git'))) {
+      const snapId = `snap-${runId}-${stepIndex}`;
+      const snapPath = path.join(artifacts.root, 'snapshots', snapId);
+      try {
+        await mkdir(snapPath, { recursive: true });
+        await cp(opts.task.repo, snapPath, { recursive: true, filter: (src) => !src.includes('node_modules') && !src.includes('.runs') });
+        snapshots.push(snapPath);
+        await emit('snapshot.created', { snapshotId: snapId, path: snapPath });
+      } catch (err: any) {
+        await emit('snapshot.failed', { error: err.message });
+      }
     }
 
     // Find and execute tool
     const tool = opts.tools.find(t => t.name === toolReq.tool);
     if (!tool) {
-      observations.push({ stepIndex: step, toolName: toolReq.tool, ok: false, error: `Unknown tool: ${toolReq.tool}` });
+      observations.push({ stepIndex, toolName: toolReq.tool, ok: false, error: `Unknown tool: ${toolReq.tool}` });
       continue;
     }
 
+    budget.recordToolCall();
     await emit('tool.started', { tool: toolReq.tool });
-    const result = await tool.run(toolReq.input);
-    await emit('tool.finished', { tool: toolReq.tool, ok: result.ok, error: result.error });
+
+    let result;
+    try {
+      result = await withRetry(
+        () => tool.run(toolReq.input),
+        { maxAttempts: 2, baseDelayMs: 500 },
+      );
+    } catch (err: any) {
+      result = { ok: false, error: err.message };
+    }
+
+    await emit('tool.finished', { tool: toolReq.tool, ok: result.ok, error: result.error, evidence: result.evidence });
+
+    // Scan output for secrets
+    if (opts.securityScan !== false && result.output) {
+      const outputStr = typeof result.output === 'string' ? result.output : JSON.stringify(result.output);
+      const outputScan = scanText(outputStr, `${toolReq.tool}.output`);
+      if (!outputScan.clean) {
+        await emit('security.finding', { tool: toolReq.tool, findings: outputScan.findings, context: 'output' });
+      }
+    }
 
     if (result.evidence?.length) {
       await emit('file.changed', { files: result.evidence });
     }
 
     observations.push({
-      stepIndex: step,
+      stepIndex,
       toolName: toolReq.tool,
       ok: result.ok,
       output: result.output,
@@ -119,12 +230,13 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
     });
   }
 
-  return finish(true, finalSummary, observations.length, startTime, artifacts, runId, taskId, opts.task);
+  return finish(true, finalSummary, budget.getState().steps, startTime, artifacts, runId, taskId, opts.task, budget, snapshots);
 }
 
 async function finish(
   ok: boolean, summary: string, steps: number, startTime: number,
   artifacts: ReturnType<typeof runArtifactLayout>, runId: string, taskId: string, task: Task,
+  budget: BudgetTracker, snapshots: string[],
 ): Promise<OrchestratorResult> {
   const durationMs = Date.now() - startTime;
   const trace = new JsonlEventStore(artifacts.trace);
@@ -135,14 +247,24 @@ async function finish(
     type: endEvent as any,
     timestamp: new Date().toISOString(),
     actor: 'orchestrator',
-    data: { summary },
+    data: { summary, budget: budget.formatSummary() },
   } as any);
 
-  // Write report
-  const report = `# Run Report\n\n- Task: ${taskId}\n- Goal: ${task.goal}\n- Result: ${summary}\n- Steps: ${steps}\n- Duration: ${durationMs}ms\n- Trace: ${artifacts.trace}\n`;
+  const budgetState = budget.getState();
+  const report = [
+    `# Run Report`,
+    ``,
+    `- Task: ${taskId}`,
+    `- Goal: ${task.goal}`,
+    `- Result: ${summary}`,
+    `- Steps: ${steps}`,
+    `- Duration: ${durationMs}ms`,
+    `- Budget: ${budget.formatSummary()}`,
+    `- Snapshots: ${snapshots.length}`,
+    `- Trace: ${artifacts.trace}`,
+  ].join('\n');
   await writeFile(artifacts.report, report, 'utf8');
 
-  // Write run manifest
   const manifest = {
     runId, taskId,
     harnessVersion: HARNESS_VERSION,
@@ -152,8 +274,10 @@ async function finish(
     summary,
     steps,
     durationMs,
+    budget: budgetState,
+    snapshots: snapshots.length,
   };
   await writeFile(artifacts.run, JSON.stringify(manifest, null, 2), 'utf8');
 
-  return { ok, summary, steps, tracePath: artifacts.trace, reportPath: artifacts.report, durationMs };
+  return { ok, summary, steps, tracePath: artifacts.trace, reportPath: artifacts.report, durationMs, budget: budgetState, snapshots };
 }
