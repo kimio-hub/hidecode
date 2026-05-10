@@ -1,7 +1,5 @@
-node_modules
-.dist
-dist
-.world-harness
-coverage
-.env
+node_modules/
+dist/
+.runs/
 *.log
+.DS_Store

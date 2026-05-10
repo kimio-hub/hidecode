@@ -1,0 +1,21 @@
+{
+  "name": "@world-harness/tools",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@world-harness/core": "workspace:*",
+    "@world-harness/policy": "workspace:*"
+  },
+  "exports": {
+    "./src/index.js": "./src/index.ts",
+    ".": "./src/index.ts"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@world-harness/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "world-harness": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@world-harness/core": "workspace:*",
+    "@world-harness/models": "workspace:*",
+    "@world-harness/orchestrator": "workspace:*",
+    "@world-harness/policy": "workspace:*",
+    "@world-harness/tools": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "exports": {
+    "./src/index.js": "./src/index.ts",
+    ".": "./src/index.ts"
+  }
+}

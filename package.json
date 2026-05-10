@@ -2,29 +2,32 @@
   "name": "world-harness",
   "version": "0.1.0",
   "private": true,
+  "description": "Task-centric, typed-tool, policy-driven coding-agent runtime.",
   "type": "module",
-  "description": "Task-centric, policy-driven coding-agent harness runtime.",
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "cli": "tsx src/cli.ts"
-  },
-  "bin": {
-    "world-harness": "dist/cli.js"
-  },
-  "dependencies": {
-    "commander": "^12.1.0",
-    "execa": "^9.6.0",
-    "fast-glob": "^3.3.3",
-    "ignore": "^5.3.2",
-    "simple-git": "^3.28.0",
-    "zod": "^3.25.76"
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "smoke": "pnpm --filter @world-harness/cli start smoke --repo ./fixtures/bugfix-ts --goal \"fix failing add test\""
   },
   "devDependencies": {
-    "@types/node": "^22.15.29",
-    "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
-    "vitest": "^2.1.9"
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^29.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "vite": "^8.0.11"
   }
 }
