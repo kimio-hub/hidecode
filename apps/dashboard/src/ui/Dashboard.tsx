@@ -1,6 +1,7 @@
 import type { TraceEvent, RunMeta } from '../data/mock';
 import { deriveApprovalQueue } from '../data/approvals';
 import { deriveReplaySteps } from '../data/replay';
+import { deriveAgentBoard } from '../data/agents';
 import TaskGraph from './components/TaskGraph';
 import ToolTimeline from './components/ToolTimeline';
 import EvidencePanel from './components/EvidencePanel';
@@ -8,6 +9,7 @@ import PolicyPanel from './components/PolicyPanel';
 import DiffPanel from './components/DiffPanel';
 import ApprovalQueue from './components/ApprovalQueue';
 import ReplayDebugger from './components/ReplayDebugger';
+import AgentBoard from './components/AgentBoard';
 import Header from './components/Header';
 
 interface Props {
@@ -27,6 +29,7 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
   const toolEvents = events.filter(e => e.type.startsWith('tool.'));
   const approvalQueue = deriveApprovalQueue(events);
   const replaySteps = deriveReplaySteps(events);
+  const agentBoard = deriveAgentBoard(events);
   const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
   const duration = formatDuration(events);
 
@@ -83,11 +86,12 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
       </aside>
 
       <main style={{ gridArea: 'main', overflow: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(110px, 1fr))', gap: '10px' }}>
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(100px, 1fr))', gap: '10px' }}>
           <MetricCard label="Events" value={String(events.length)} tone="#93c5fd" />
           <MetricCard label="Tools" value={String(toolEvents.length)} tone="#a78bfa" />
           <MetricCard label="Risk" value={riskEvents.length > 0 ? `${riskEvents.length} signals` : 'Clear'} tone={riskEvents.length > 0 ? '#fbbf24' : '#4ade80'} />
           <MetricCard label="Approvals" value={String(approvalQueue.length)} tone={approvalQueue.length > 0 ? '#facc15' : '#4ade80'} />
+          <MetricCard label="Agents" value={String(agentBoard.length)} tone="#38bdf8" />
           <MetricCard label="Duration" value={duration} tone="#f0abfc" />
         </section>
 
@@ -103,6 +107,12 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
         <section style={{ minHeight: '320px' }}>
           <Panel title="Replay Debug">
             <ReplayDebugger steps={replaySteps} />
+          </Panel>
+        </section>
+
+        <section style={{ minHeight: '280px' }}>
+          <Panel title="Multi-Agent Board">
+            <AgentBoard items={agentBoard} />
           </Panel>
         </section>
 

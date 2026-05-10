@@ -6,7 +6,7 @@ import { MOCK_EVENTS, MOCK_RUN } from '../../data/mock';
 describe('Dashboard', () => {
   it('renders the header with task id', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
-    expect(screen.getByText(MOCK_RUN.taskId)).toBeInTheDocument();
+    expect(screen.getAllByText(MOCK_RUN.taskId).length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders all panel titles', () => {
@@ -25,9 +25,9 @@ describe('Dashboard', () => {
     expect(screen.getByText('Control')).toBeInTheDocument();
     expect(screen.getAllByText('Approvals').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Replay').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Agents')).toBeInTheDocument();
-    expect(screen.getByText('Events')).toBeInTheDocument();
-    expect(screen.getByText('Tools')).toBeInTheDocument();
+    expect(screen.getAllByText('Agents').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Events').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Tools').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Risk')).toBeInTheDocument();
     expect(screen.getByText('Duration')).toBeInTheDocument();
     expect(screen.getByText('Command Dock')).toBeInTheDocument();
@@ -52,6 +52,19 @@ describe('Dashboard', () => {
     expect(screen.getByRole('button', { name: 'Replay' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Fork' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save Eval' })).toBeDisabled();
+  });
+
+  it('renders read-only multi-agent board items and future actions', () => {
+    render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
+    expect(screen.getByText('Multi-Agent Board')).toBeInTheDocument();
+    expect(screen.getAllByText('Agents').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('agent').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Assign')).toBeInTheDocument();
+    expect(screen.getByText('Handoff')).toBeInTheDocument();
+    expect(screen.getByText('Unblock')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Assign' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Handoff' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Unblock' })).toBeDisabled();
   });
 
   it('shows model name in header', () => {

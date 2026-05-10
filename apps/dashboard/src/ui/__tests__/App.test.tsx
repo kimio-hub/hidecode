@@ -20,7 +20,7 @@ describe('App data loading', () => {
   it('renders mock data by default', () => {
     render(<App />);
     expect(screen.getByText('Mock')).toBeInTheDocument();
-    expect(screen.getByText('task-1778423383432')).toBeInTheDocument();
+    expect(screen.getAllByText('task-1778423383432').length).toBeGreaterThanOrEqual(1);
   });
 
   it('loads a run directory from the run query parameter', async () => {
@@ -50,7 +50,7 @@ describe('App data loading', () => {
     render(<App />);
 
     expect(screen.getByText('Loading run trace…')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('task-real')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('task-real').length).toBeGreaterThanOrEqual(1));
     expect(screen.getByText('Run URL: /runs/demo')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/runs/demo/trace.jsonl');
     expect(fetch).toHaveBeenCalledWith('/runs/demo/run.json');
