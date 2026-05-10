@@ -18,6 +18,22 @@ describe('Dashboard', () => {
     expect(screen.getByText('Diff / Changes')).toBeInTheDocument();
   });
 
+  it('renders Mission Control v2 shell elements', () => {
+    render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
+    expect(screen.getByText('Mission Control')).toBeInTheDocument();
+    expect(screen.getByText('Control')).toBeInTheDocument();
+    expect(screen.getByText('Approvals')).toBeInTheDocument();
+    expect(screen.getByText('Replay')).toBeInTheDocument();
+    expect(screen.getByText('Agents')).toBeInTheDocument();
+    expect(screen.getByText('Events')).toBeInTheDocument();
+    expect(screen.getByText('Tools')).toBeInTheDocument();
+    expect(screen.getByText('Risk')).toBeInTheDocument();
+    expect(screen.getByText('Duration')).toBeInTheDocument();
+    expect(screen.getByText('Command Dock')).toBeInTheDocument();
+    expect(screen.getByText('Terminal')).toBeInTheDocument();
+    expect(screen.getByText('Ask Harness')).toBeInTheDocument();
+  });
+
   it('shows model name in header', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
     expect(screen.getByText(MOCK_RUN.model.name)).toBeInTheDocument();

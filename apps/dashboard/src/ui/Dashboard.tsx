@@ -12,53 +12,154 @@ interface Props {
   sourceLabel?: string;
 }
 
+const navItems = [
+  { label: 'Control', status: 'Live' },
+  { label: 'Approvals', status: 'Queue' },
+  { label: 'Replay', status: 'Trace' },
+  { label: 'Agents', status: 'Board' },
+];
+
 export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) {
+  const toolEvents = events.filter(e => e.type.startsWith('tool.'));
+  const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
+  const duration = formatDuration(events);
+
   return (
     <div style={{
       display: 'grid',
       gridTemplateRows: '56px 1fr',
-      gridTemplateColumns: '280px 1fr 320px',
+      gridTemplateColumns: '220px minmax(560px, 1fr) 340px',
       gridTemplateAreas: `
         "header header header"
-        "left   center right"
+        "nav    main   inspector"
       `,
       height: '100vh',
-      background: '#0a0a0f',
+      background: 'radial-gradient(circle at top left, rgba(124,58,237,0.12), transparent 30%), #0a0a0f',
       color: '#e0e0e8',
       fontFamily: "'Inter', -apple-system, sans-serif",
     }}>
       <Header run={run} events={events} sourceLabel={sourceLabel} />
 
-      {/* Left: Task Graph */}
-      <div style={{ gridArea: 'left', borderRight: '1px solid #1e1e2e', overflow: 'auto', padding: '12px' }}>
-        <PanelTitle title="Task Graph" />
-        <TaskGraph events={events} />
-      </div>
-
-      {/* Center: Tool Timeline + Diff */}
-      <div style={{ gridArea: 'center', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, padding: '12px', borderBottom: '1px solid #1e1e2e' }}>
-          <PanelTitle title="Tool Timeline" />
-          <ToolTimeline events={events} />
+      <aside style={{
+        gridArea: 'nav',
+        borderRight: '1px solid #1e1e2e',
+        background: 'rgba(15, 15, 23, 0.82)',
+        padding: '16px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+      }}>
+        <div>
+          <div style={{ color: '#fff', fontSize: '15px', fontWeight: 800 }}>Mission Control</div>
+          <div style={{ color: '#666', fontSize: '11px', marginTop: '4px' }}>Agent runtime cockpit</div>
         </div>
-        <div style={{ flex: 1, padding: '12px', overflow: 'auto' }}>
-          <PanelTitle title="Diff / Changes" />
-          <DiffPanel events={events} />
-        </div>
-      </div>
 
-      {/* Right: Evidence + Policy */}
-      <div style={{ gridArea: 'right', borderLeft: '1px solid #1e1e2e', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, padding: '12px', borderBottom: '1px solid #1e1e2e' }}>
-          <PanelTitle title="Evidence" />
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {navItems.map((item, index) => (
+            <div key={item.label} style={{
+              border: '1px solid ' + (index === 0 ? '#4c1d95' : '#23233a'),
+              background: index === 0 ? 'rgba(124, 58, 237, 0.16)' : 'rgba(255,255,255,0.02)',
+              borderRadius: '12px',
+              padding: '10px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: index === 0 ? '#ddd6fe' : '#cbd5e1', fontSize: '13px', fontWeight: 650 }}>{item.label}</span>
+                <span style={{ color: '#71717a', fontSize: '10px' }}>{item.status}</span>
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div style={{ marginTop: 'auto', border: '1px solid #23233a', borderRadius: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ color: '#888', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Run</div>
+          <div style={{ color: '#e5e7eb', fontSize: '12px', marginTop: '8px', overflowWrap: 'anywhere' }}>{run.runId}</div>
+        </div>
+      </aside>
+
+      <main style={{ gridArea: 'main', overflow: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(110px, 1fr))', gap: '10px' }}>
+          <MetricCard label="Events" value={String(events.length)} tone="#93c5fd" />
+          <MetricCard label="Tools" value={String(toolEvents.length)} tone="#a78bfa" />
+          <MetricCard label="Risk" value={riskEvents.length > 0 ? `${riskEvents.length} signals` : 'Clear'} tone={riskEvents.length > 0 ? '#fbbf24' : '#4ade80'} />
+          <MetricCard label="Duration" value={duration} tone="#f0abfc" />
+        </section>
+
+        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 0.9fr) minmax(320px, 1.2fr)', gap: '12px', minHeight: '310px' }}>
+          <Panel title="Task Graph">
+            <TaskGraph events={events} />
+          </Panel>
+          <Panel title="Tool Timeline">
+            <ToolTimeline events={events} />
+          </Panel>
+        </section>
+
+        <section style={{ minHeight: '260px' }}>
+          <Panel title="Diff / Changes">
+            <DiffPanel events={events} />
+          </Panel>
+        </section>
+
+        <section style={{ border: '1px solid #1e1e2e', borderRadius: '14px', background: '#0f0f17', padding: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <PanelTitle title="Command Dock" />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <DockPill label="Terminal" />
+              <DockPill label="Ask Harness" />
+            </div>
+          </div>
+          <div style={{
+            border: '1px solid #23233a',
+            borderRadius: '10px',
+            background: '#09090f',
+            padding: '12px',
+            color: '#71717a',
+            fontSize: '12px',
+          }}>
+            Read-only dock placeholder. Next cycles will connect approvals, replay controls, and live agent commands.
+          </div>
+        </section>
+      </main>
+
+      <aside style={{ gridArea: 'inspector', borderLeft: '1px solid #1e1e2e', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', background: 'rgba(15, 15, 23, 0.72)' }}>
+        <Panel title="Evidence">
           <EvidencePanel events={events} />
-        </div>
-        <div style={{ flex: 1, padding: '12px', overflow: 'auto' }}>
-          <PanelTitle title="Policy / Risk" />
+        </Panel>
+        <Panel title="Policy / Risk">
           <PolicyPanel events={events} />
-        </div>
-      </div>
+        </Panel>
+      </aside>
     </div>
+  );
+}
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      height: '100%',
+      border: '1px solid #1e1e2e',
+      borderRadius: '14px',
+      background: 'rgba(15, 15, 23, 0.92)',
+      padding: '12px',
+      overflow: 'auto',
+    }}>
+      <PanelTitle title={title} />
+      {children}
+    </div>
+  );
+}
+
+function MetricCard({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div style={{ border: '1px solid #1e1e2e', borderRadius: '14px', background: 'rgba(15, 15, 23, 0.92)', padding: '12px' }}>
+      <div style={{ color: '#71717a', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+      <div style={{ color: tone, fontSize: '20px', fontWeight: 800, marginTop: '8px' }}>{value}</div>
+    </div>
+  );
+}
+
+function DockPill({ label }: { label: string }) {
+  return (
+    <span style={{ border: '1px solid #2d2d44', borderRadius: '999px', padding: '4px 9px', color: '#a1a1aa', fontSize: '11px' }}>{label}</span>
   );
 }
 
@@ -70,9 +171,17 @@ function PanelTitle({ title }: { title: string }) {
       textTransform: 'uppercase',
       letterSpacing: '0.08em',
       color: '#888',
-      marginBottom: '8px',
+      margin: '0 0 8px 0',
     }}>
       {title}
     </h3>
   );
+}
+
+function formatDuration(events: TraceEvent[]): string {
+  if (events.length < 2) return '—';
+  const start = new Date(events[0].timestamp).getTime();
+  const end = new Date(events[events.length - 1].timestamp).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return '—';
+  return `${((end - start) / 1000).toFixed(1)}s`;
 }
