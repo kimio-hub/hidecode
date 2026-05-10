@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { HARNESS_VERSION, TaskSchema } from '@world-harness/core';
 import { ScriptedModelAdapter, OpenAIModelAdapter } from '@world-harness/models';
 import { runSingleAgentTask } from '@world-harness/orchestrator';
@@ -20,6 +20,20 @@ function parseSandboxNetwork(value?: string): 'enabled' | 'disabled' {
   if (value === undefined) return 'enabled';
   if (value === 'enabled' || value === 'disabled') return value;
   throw new Error(`Unsupported sandbox network mode: ${value}`);
+}
+
+function dashboardRunQuery(runRoot: string): string {
+  return `?run=${encodeURIComponent(runRoot)}`;
+}
+
+function printArtifactHints(result: { tracePath: string; reportPath: string }) {
+  const runRoot = dirname(result.tracePath);
+  const manifestPath = join(runRoot, 'run.json');
+  console.log(`[world-harness] Trace: ${result.tracePath}`);
+  console.log(`[world-harness] Run manifest: ${manifestPath}`);
+  console.log(`[world-harness] Report: ${result.reportPath}`);
+  console.log(`[world-harness] Dashboard query: ${dashboardRunQuery(runRoot)}`);
+  console.log('[world-harness] Dashboard note: serve or copy .runs output under the dashboard dev server before opening this query.');
 }
 
 function createLocalSandbox(opts: { sandboxTimeoutMs?: string; sandboxMaxBuffer?: string; sandboxNetwork?: string }) {
@@ -97,8 +111,7 @@ program.command('run')
     console.log();
     console.log(`[world-harness] ${result.ok ? '✓' : '✗'} ${result.summary}`);
     console.log(`[world-harness] Steps: ${result.steps}, Duration: ${result.durationMs}ms`);
-    console.log(`[world-harness] Trace: ${result.tracePath}`);
-    console.log(`[world-harness] Report: ${result.reportPath}`);
+    printArtifactHints(result);
 
     process.exit(result.ok ? 0 : 1);
   });
@@ -127,6 +140,7 @@ program.command('smoke')
       policy: { id: 'smoke-allow-execute', allow: ['read', 'write', 'execute', 'git', 'network'], ask: [], deny: ['rm -rf', 'secret'] },
     });
     console.log(`[smoke] ${result.ok ? 'PASS' : 'FAIL'} — ${result.summary}`);
+    printArtifactHints(result);
     process.exit(result.ok ? 0 : 1);
   });
 

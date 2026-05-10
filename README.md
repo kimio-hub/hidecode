@@ -36,6 +36,24 @@ pnpm --filter @world-harness/cli start -- inspect ./artifacts/<task-id>/trace.js
 pnpm --filter @world-harness/cli start -- replay ./artifacts/<task-id>/trace.jsonl
 ```
 
+After a successful `run` or `smoke`, the CLI prints the generated trace, `run.json` manifest, report, and a Dashboard query hint:
+
+```text
+[world-harness] Trace: /path/to/repo/.runs/run-.../trace.jsonl
+[world-harness] Run manifest: /path/to/repo/.runs/run-.../run.json
+[world-harness] Report: /path/to/repo/.runs/run-.../report.md
+[world-harness] Dashboard query: ?run=%2Fpath%2Fto%2Frepo%2F.runs%2Frun-...
+[world-harness] Dashboard note: serve or copy .runs output under the dashboard dev server before opening this query.
+```
+
+The Dashboard fetches browser-accessible URLs, not arbitrary local filesystem files. To inspect the same run, serve or copy the `.runs/run-...` directory under a path the dashboard dev server can fetch, then open it with the printed query form (or explicit trace/manifest URLs):
+
+```bash
+pnpm --filter @world-harness/dashboard dev
+# then open http://localhost:5173/?run=<browser-accessible-run-directory-url>
+# or http://localhost:5173/?trace=<browser-accessible-trace.jsonl-url>&manifest=<browser-accessible-run.json-url>
+```
+
 Notes:
 
 - `--sandbox local` is currently the only supported execution backend.
