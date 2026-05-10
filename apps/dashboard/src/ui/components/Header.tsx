@@ -4,9 +4,10 @@ import { Cpu, Zap, Clock, DollarSign, Hash } from 'lucide-react';
 interface Props {
   run: RunMeta;
   events: TraceEvent[];
+  sourceLabel?: string;
 }
 
-export default function Header({ run, events }: Props) {
+export default function Header({ run, events, sourceLabel = 'Mock' }: Props) {
   const completed = events.filter(e => e.type === 'task.completed').length > 0;
   const failed = events.filter(e => e.type === 'task.failed').length > 0;
   const statusColor = completed ? '#4ade80' : failed ? '#f87171' : '#facc15';
@@ -41,6 +42,7 @@ export default function Header({ run, events }: Props) {
       </div>
       <div style={{ width: '1px', height: '24px', background: '#1e1e2e' }} />
       <span style={{ color: '#aaa' }}>{run.taskId}</span>
+      <span style={{ color: '#555', fontSize: '11px' }}>{run.runId}</span>
       <div style={{ width: '1px', height: '24px', background: '#1e1e2e' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColor }} />
@@ -49,6 +51,21 @@ export default function Header({ run, events }: Props) {
       <div style={{ flex: 1 }} />
 
       {/* Budget info */}
+      <div style={{
+        background: '#111827',
+        borderRadius: '999px',
+        padding: '4px 10px',
+        fontSize: '11px',
+        color: '#93c5fd',
+        border: '1px solid #1d4ed8',
+        maxWidth: '220px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }} title={sourceLabel}>
+        {sourceLabel}
+      </div>
+
       {securityFindings > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f87171', fontSize: '12px' }}>
           <span>⚠ {securityFindings} findings</span>

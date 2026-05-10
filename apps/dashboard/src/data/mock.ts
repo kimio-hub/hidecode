@@ -1,20 +1,6 @@
-export interface TraceEvent {
-  eventId: string;
-  runId: string;
-  taskId: string;
-  type: string;
-  timestamp: string;
-  actor: string;
-  data: Record<string, unknown>;
-}
+import type { TraceEvent, RunMeta } from './loader';
 
-export interface RunMeta {
-  runId: string;
-  taskId: string;
-  harnessVersion: string;
-  model: { provider: string; name: string };
-  summary: string;
-}
+export type { TraceEvent, RunMeta };
 
 export const MOCK_RUN: RunMeta = {
   runId: 'run-1778423383435',

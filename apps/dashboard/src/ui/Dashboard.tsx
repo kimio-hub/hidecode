@@ -9,9 +9,10 @@ import Header from './components/Header';
 interface Props {
   events: TraceEvent[];
   run: RunMeta;
+  sourceLabel?: string;
 }
 
-export default function Dashboard({ events, run }: Props) {
+export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) {
   return (
     <div style={{
       display: 'grid',
@@ -26,7 +27,7 @@ export default function Dashboard({ events, run }: Props) {
       color: '#e0e0e8',
       fontFamily: "'Inter', -apple-system, sans-serif",
     }}>
-      <Header run={run} events={events} />
+      <Header run={run} events={events} sourceLabel={sourceLabel} />
 
       {/* Left: Task Graph */}
       <div style={{ gridArea: 'left', borderRight: '1px solid #1e1e2e', overflow: 'auto', padding: '12px' }}>
