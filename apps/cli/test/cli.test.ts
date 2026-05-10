@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -56,5 +56,52 @@ describe('cli package', () => {
     expect(result.stdout).toContain('[world-harness] Dashboard query: ?run=');
     expect(result.stdout).toContain('%2F');
     expect(result.stdout).toContain('Dashboard note: serve or copy .runs output under the dashboard dev server');
+  });
+
+  it('prints dashboard hints when inspecting a trace next to a run manifest', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'wh-cli-'));
+    const runDir = join(repo, '.runs', 'run-test');
+    mkdirSync(runDir, { recursive: true });
+    const tracePath = join(runDir, 'trace.jsonl');
+    writeFileSync(tracePath, `${JSON.stringify({
+      eventId: 'evt-1',
+      runId: 'run-test',
+      taskId: 'task-test',
+      type: 'task.completed',
+      timestamp: '2026-05-10T00:00:00.000Z',
+      actor: 'runtime',
+      data: { summary: 'done' },
+    })}\n`);
+    writeFileSync(join(runDir, 'run.json'), JSON.stringify({ runId: 'run-test', taskId: 'task-test' }));
+
+    const result = runCli(['inspect', tracePath]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Trace:');
+    expect(result.stdout).toContain('[world-harness] Run manifest:');
+    expect(result.stdout).toContain('[world-harness] Dashboard query: ?run=');
+  });
+
+  it('prints dashboard hints after replaying a trace next to a run manifest', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'wh-cli-'));
+    const runDir = join(repo, '.runs', 'run-test');
+    mkdirSync(runDir, { recursive: true });
+    const tracePath = join(runDir, 'trace.jsonl');
+    writeFileSync(tracePath, `${JSON.stringify({
+      eventId: 'evt-1',
+      runId: 'run-test',
+      taskId: 'task-test',
+      type: 'task.completed',
+      timestamp: '2026-05-10T00:00:00.000Z',
+      actor: 'runtime',
+      data: { summary: 'done' },
+    })}\n`);
+    writeFileSync(join(runDir, 'run.json'), JSON.stringify({ runId: 'run-test', taskId: 'task-test' }));
+
+    const result = runCli(['replay', tracePath]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Replay complete.');
+    expect(result.stdout).toContain('[world-harness] Dashboard query: ?run=');
   });
 });

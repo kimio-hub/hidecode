@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { HARNESS_VERSION, TaskSchema } from '@world-harness/core';
 import { ScriptedModelAdapter, OpenAIModelAdapter } from '@world-harness/models';
@@ -24,6 +24,20 @@ function parseSandboxNetwork(value?: string): 'enabled' | 'disabled' {
 
 function dashboardRunQuery(runRoot: string): string {
   return `?run=${encodeURIComponent(runRoot)}`;
+}
+
+async function printTraceDashboardHint(tracePath: string) {
+  const runRoot = dirname(tracePath);
+  const manifestPath = join(runRoot, 'run.json');
+  try {
+    await access(manifestPath);
+  } catch {
+    return;
+  }
+
+  console.log(`[world-harness] Run manifest: ${manifestPath}`);
+  console.log(`[world-harness] Dashboard query: ${dashboardRunQuery(runRoot)}`);
+  console.log('[world-harness] Dashboard note: serve or copy this run directory under the dashboard dev server before opening this query.');
 }
 
 function printArtifactHints(result: { tracePath: string; reportPath: string }) {
@@ -56,6 +70,7 @@ program.command('inspect').argument('<trace>').action(async (trace) => {
     const ts = new Date(evt.timestamp).toLocaleTimeString();
     console.log(`  [${ts}] ${evt.type} — ${JSON.stringify(evt.data).slice(0, 80)}`);
   }
+  await printTraceDashboardHint(trace);
 });
 
 // ─── run: execute a task with real LLM ─────────────────────────
@@ -153,6 +168,7 @@ program.command('replay').argument('<trace>').action(async (tracePath) => {
     console.log(`  [${evt.type}] ${JSON.stringify(evt.data).slice(0, 100)}`);
   }
   console.log('Replay complete.');
+  await printTraceDashboardHint(tracePath);
 });
 
 program.parse();
