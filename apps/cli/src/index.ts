@@ -1,15 +1,35 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
+import { resolve } from 'node:path';
 import { HARNESS_VERSION, TaskSchema } from '@world-harness/core';
 import { ScriptedModelAdapter, OpenAIModelAdapter } from '@world-harness/models';
 import { runSingleAgentTask } from '@world-harness/orchestrator';
-import { createRepoTools } from '@world-harness/tools';
+import { createRepoTools, LocalSandbox } from '@world-harness/tools';
 import { defaultPolicy } from '@world-harness/policy';
 
 const program = new Command();
 program.name('world-harness').version(HARNESS_VERSION);
+
+function parseIntOption(value: string, fallback: number): number {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseSandboxNetwork(value?: string): 'enabled' | 'disabled' {
+  if (value === undefined) return 'enabled';
+  if (value === 'enabled' || value === 'disabled') return value;
+  throw new Error(`Unsupported sandbox network mode: ${value}`);
+}
+
+function createLocalSandbox(opts: { sandboxTimeoutMs?: string; sandboxMaxBuffer?: string; sandboxNetwork?: string }) {
+  return new LocalSandbox({
+    timeoutMs: parseIntOption(opts.sandboxTimeoutMs ?? '60000', 60000),
+    maxBuffer: parseIntOption(opts.sandboxMaxBuffer ?? String(1024 * 1024), 1024 * 1024),
+    network: parseSandboxNetwork(opts.sandboxNetwork),
+    env: {},
+  });
+}
 
 // ─── inspect: read and display a trace ─────────────────────────
 program.command('inspect').argument('<trace>').action(async (trace) => {
@@ -33,11 +53,15 @@ program.command('run')
   .option('--api-key <key>', 'API key', process.env.OPENAI_API_KEY ?? '')
   .option('--max-steps <n>', 'Max reasoning steps', '20')
   .option('--mode <mode>', 'Task mode', 'plan')
+  .option('--sandbox <mode>', 'Execution sandbox mode (local)', 'local')
+  .option('--sandbox-timeout-ms <n>', 'Sandbox command timeout in milliseconds', '60000')
+  .option('--sandbox-max-buffer <n>', 'Sandbox stdout/stderr max buffer in bytes', String(1024 * 1024))
+  .option('--sandbox-network <mode>', 'Sandbox network policy metadata (enabled|disabled)', 'enabled')
   .action(async (opts) => {
     const task = TaskSchema.parse({
       taskId: `task-${Date.now()}`,
       goal: opts.goal,
-      repo: path.resolve(opts.repo),
+      repo: resolve(opts.repo),
       mode: opts.mode ?? 'autonomous',
     });
 
@@ -48,15 +72,19 @@ program.command('run')
       maxSteps: parseInt(opts.maxSteps),
     });
 
+    if (opts.sandbox !== 'local') throw new Error(`Unsupported sandbox mode: ${opts.sandbox}`);
+    const sandbox = createLocalSandbox(opts);
+
     console.log(`[world-harness] Running task: ${task.goal}`);
     console.log(`[world-harness] Model: ${model.name}`);
     console.log(`[world-harness] Workspace: ${task.repo}`);
+    console.log(`[world-harness] Sandbox: ${sandbox.mode} timeout=${parseIntOption(opts.sandboxTimeoutMs, 60000)}ms maxBuffer=${parseIntOption(opts.sandboxMaxBuffer, 1024 * 1024)} network=${parseSandboxNetwork(opts.sandboxNetwork)}`);
     console.log();
 
     const result = await runSingleAgentTask({
       task,
       model,
-      tools: createRepoTools(task.repo),
+      tools: createRepoTools(task.repo, { sandbox }),
       policy: defaultPolicy,
       budget: { maxSteps: parseInt(opts.maxSteps) },
       onEvent: (evt: any) => {
@@ -83,7 +111,7 @@ program.command('smoke')
     const task = TaskSchema.parse({
       taskId: `task-${Date.now()}`,
       goal: opts.goal,
-      repo: path.resolve(opts.repo),
+      repo: resolve(opts.repo),
       mode: 'autonomous',
     });
 
@@ -92,7 +120,12 @@ program.command('smoke')
       { kind: 'final', summary: 'smoke completed: runtime emitted trace and report' },
     ]);
 
-    const result = await runSingleAgentTask({ task, model, tools: createRepoTools(task.repo) });
+    const result = await runSingleAgentTask({
+      task,
+      model,
+      tools: createRepoTools(task.repo, { sandbox: new LocalSandbox({ env: {} }) }),
+      policy: { id: 'smoke-allow-execute', allow: ['read', 'write', 'execute', 'git', 'network'], ask: [], deny: ['rm -rf', 'secret'] },
+    });
     console.log(`[smoke] ${result.ok ? 'PASS' : 'FAIL'} — ${result.summary}`);
     process.exit(result.ok ? 0 : 1);
   });

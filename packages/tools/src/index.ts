@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { dirname, resolve, sep } from 'node:path';
 import type { ToolResult, TypedTool } from '@world-harness/core';
+import { LocalSandbox, type ExecutionSandbox } from './sandbox.js';
 const execFileAsync = promisify(execFile);
 
 // ─── Path Safety ───────────────────────────────────────────────
@@ -201,7 +202,10 @@ export const gitBranchTool: TypedTool<{ name: string; cwd?: string }, string> = 
 };
 
 // ─── Repo-scoped Wrappers ───────────────────────────────────────
-export function createRepoTools(repo: string): TypedTool[] {
+export type RepoToolsOptions = { sandbox?: ExecutionSandbox };
+
+export function createRepoTools(repo: string, options: RepoToolsOptions = {}): TypedTool[] {
+  const sandbox = options.sandbox ?? new LocalSandbox();
   const scopedReadPath = (target: string) => assertRealInside(repo, target);
   const scopedWritePath = (target: string) => assertWritableInside(repo, target);
   const scopedCwd = async (cwd?: string) => cwd ? assertRealInside(repo, cwd) : realpath(repo);
@@ -252,7 +256,14 @@ export function createRepoTools(repo: string): TypedTool[] {
       async run(input: { command: string; cwd?: string }) {
         try {
           if (commandLooksUnsafe(input.command)) throw new Error('command references paths outside repo');
-          return await runTool.run({ ...input, cwd: await scopedCwd(input.cwd) });
+          const cwd = await scopedCwd(input.cwd);
+          const result = await sandbox.execute({ command: input.command, repo, cwd });
+          return {
+            ok: result.ok,
+            output: { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode },
+            error: result.error,
+            evidence: [],
+          };
         } catch (error) {
           return evidenceFailure(error, { stdout: '', stderr: '', exitCode: 1 });
         }
@@ -264,7 +275,14 @@ export function createRepoTools(repo: string): TypedTool[] {
         try {
           const command = input.command ?? 'pnpm test';
           if (commandLooksUnsafe(command)) throw new Error('command references paths outside repo');
-          return await testTool.run({ ...input, command, cwd: await scopedCwd(input.cwd) });
+          const cwd = await scopedCwd(input.cwd);
+          const result = await sandbox.execute({ command, repo, cwd });
+          return {
+            ok: result.ok,
+            output: { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode },
+            error: result.error,
+            evidence: [],
+          };
         } catch (error) {
           return evidenceFailure(error, { stdout: '', stderr: '', exitCode: 1 });
         }
@@ -304,3 +322,5 @@ export const localTools: TypedTool[] = [
 export function getToolByName(name: string): TypedTool | undefined {
   return localTools.find(t => t.name === name);
 }
+
+export * from './sandbox.js';
