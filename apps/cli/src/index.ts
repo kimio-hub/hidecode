@@ -35,10 +35,10 @@ program.command('run')
   .option('--mode <mode>', 'Task mode', 'plan')
   .action(async (opts) => {
     const task = TaskSchema.parse({
-      id: `task-${Date.now()}`,
+      taskId: `task-${Date.now()}`,
       goal: opts.goal,
       repo: path.resolve(opts.repo),
-      mode: opts.mode,
+      mode: opts.mode ?? 'autonomous',
     });
 
     const model = new OpenAIModelAdapter({
@@ -81,9 +81,10 @@ program.command('smoke')
   .requiredOption('--goal <text>', 'Task goal description')
   .action(async (opts) => {
     const task = TaskSchema.parse({
-      id: `task-${Date.now()}`,
+      taskId: `task-${Date.now()}`,
       goal: opts.goal,
       repo: path.resolve(opts.repo),
+      mode: 'autonomous',
     });
 
     const model = new ScriptedModelAdapter([

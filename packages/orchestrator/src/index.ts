@@ -57,7 +57,7 @@ interface Subtask {
 export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<OrchestratorResult> {
   const startTime = Date.now();
   const runId = `run-${startTime}`;
-  const taskId = opts.task.id ?? `task-${startTime}`;
+  const taskId = opts.task.taskId ?? `task-${startTime}`;
   const artifacts = runArtifactLayout(opts.task.repo, runId);
   const trace = new JsonlEventStore(artifacts.trace);
   const budget = new BudgetTracker(opts.budget ?? { maxSteps: 20 });
