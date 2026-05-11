@@ -64,6 +64,14 @@ export interface DashboardRuntimeActionReadiness {
   lastError?: string;
 }
 
+export type RuntimeActionReadinessTone = 'muted' | 'danger' | 'warning' | 'success';
+
+export interface RuntimeActionReadinessIndicator {
+  label: string;
+  tone: RuntimeActionReadinessTone;
+  detail: string;
+}
+
 export const DEFAULT_RUNTIME_ACTION_READINESS: DashboardRuntimeActionReadiness = {
   state: 'not-configured',
   canSubmitActions: false,
@@ -174,8 +182,33 @@ export function runtimeActionReadinessMessage(status: DashboardRuntimeActionRead
     case 'preview-only':
       return `Runtime actions preview only: ${status.reason}`;
     case 'online':
-      return `Runtime actions ready: ${status.reason}`;
+      return status.canSubmitActions
+        ? `Runtime actions ready: ${status.reason}`
+        : `Runtime actions preview only: online backend cannot submit actions until the dashboard-runtime-actions.v1 contract is confirmed. ${status.reason}`;
   }
+}
+
+export function runtimeActionReadinessIndicator(input?: Partial<DashboardRuntimeActionReadiness>): RuntimeActionReadinessIndicator {
+  const status = normalizeRuntimeActionReadiness(input);
+  const detail = runtimeActionReadinessMessage(status);
+
+  switch (status.state) {
+    case 'not-configured':
+      return { label: 'Offline', tone: 'muted', detail };
+    case 'offline':
+      return { label: 'Offline', tone: 'danger', detail };
+    case 'preview-only':
+      return { label: 'Preview only', tone: 'warning', detail };
+    case 'online':
+      return status.canSubmitActions
+        ? { label: 'Ready', tone: 'success', detail }
+        : { label: 'Preview only', tone: 'warning', detail };
+  }
+}
+
+export function runtimeActionPreview(request: RuntimeActionRequest): string {
+  const target = request.target ? `${request.target.kind}${request.target.id ? `:${request.target.id}` : ''}` : 'untargeted';
+  return `${request.domain}.${request.action} → ${target}${request.clientRequestId ? ` · client=${request.clientRequestId}` : ''}`;
 }
 
 export function normalizeRuntimeActionReadiness(input?: Partial<DashboardRuntimeActionReadiness>): DashboardRuntimeActionReadiness {

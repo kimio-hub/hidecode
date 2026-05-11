@@ -8,6 +8,8 @@ import {
   actionReasonAttributes,
   DEFAULT_RUNTIME_ACTION_READINESS,
   normalizeRuntimeActionReadiness,
+  runtimeActionPreview,
+  runtimeActionReadinessIndicator,
   runtimeActionReadinessMessage,
   toRuntimeActionAuditEvent,
   toRuntimeActionRequest,
@@ -129,6 +131,53 @@ describe('Dashboard runtime action readiness', () => {
         reason: 'Runtime action backend is online with an unknown contract.',
       }),
     ).toMatchObject({ state: 'online', canSubmitActions: false });
+  });
+
+  it('derives concise UI indicators from normalized readiness', () => {
+    expect(runtimeActionReadinessIndicator(DEFAULT_RUNTIME_ACTION_READINESS)).toEqual({
+      label: 'Offline',
+      tone: 'muted',
+      detail: 'Runtime actions unavailable: backend not configured.',
+    });
+
+    expect(runtimeActionReadinessIndicator({
+      state: 'offline',
+      canSubmitActions: true,
+      reason: 'Health check failed.',
+      lastError: 'ECONNREFUSED',
+    })).toEqual({
+      label: 'Offline',
+      tone: 'danger',
+      detail: 'Runtime actions unavailable: backend offline. Health check failed. Last error: ECONNREFUSED',
+    });
+
+    expect(runtimeActionReadinessIndicator({
+      state: 'preview-only',
+      canSubmitActions: true,
+      reason: 'Submission remains policy-gated.',
+      contractVersion: 'dashboard-runtime-actions.v1',
+    })).toEqual({
+      label: 'Preview only',
+      tone: 'warning',
+      detail: 'Runtime actions preview only: Submission remains policy-gated.',
+    });
+
+    expect(runtimeActionReadinessIndicator({
+      state: 'online',
+      canSubmitActions: true,
+      reason: 'Runtime action backend is online and contract-compatible.',
+      contractVersion: 'dashboard-runtime-actions.v1',
+    })).toMatchObject({ label: 'Ready', tone: 'success' });
+
+    expect(runtimeActionReadinessIndicator({
+      state: 'online',
+      canSubmitActions: true,
+      reason: 'Runtime action backend is online with an unknown contract.',
+    })).toEqual({
+      label: 'Preview only',
+      tone: 'warning',
+      detail: 'Runtime actions preview only: online backend cannot submit actions until the dashboard-runtime-actions.v1 contract is confirmed. Runtime action backend is online with an unknown contract.',
+    });
   });
 });
 
@@ -273,6 +322,20 @@ describe('Dashboard runtime action intents', () => {
       target: { kind: 'command' },
       requiresBackend: true,
     });
+  });
+
+  it('builds a readable action request preview from the runtime contract shape', () => {
+    expect(runtimeActionPreview(toRuntimeActionRequest(buildApprovalActionIntent('approve', 'approval-1'), 'client-1'))).toBe(
+      'approval.approve → approval:approval-1 · client=client-1',
+    );
+
+    expect(runtimeActionPreview(toRuntimeActionRequest(buildReplayActionIntent('save-eval', { kind: 'run' })))).toBe(
+      'replay.save-eval → run',
+    );
+
+    expect(runtimeActionPreview(toRuntimeActionRequest(buildCommandActionIntent('ask-harness')))).toBe(
+      'command.ask-harness → command',
+    );
   });
 
   it('models accepted runtime action responses and audit events without side effects', () => {

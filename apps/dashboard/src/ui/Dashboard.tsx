@@ -4,8 +4,9 @@ import {
   buildCommandActionIntent,
   DEFAULT_RUNTIME_ACTION_READINESS,
   type DashboardRuntimeActionReadiness,
-  normalizeRuntimeActionReadiness,
-  runtimeActionReadinessMessage,
+  runtimeActionPreview,
+  runtimeActionReadinessIndicator,
+  toRuntimeActionRequest,
 } from '../data/actions';
 import { deriveApprovalQueue } from '../data/approvals';
 import { deriveReplaySteps } from '../data/replay';
@@ -40,8 +41,8 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock', runtimeAc
   const replaySteps = deriveReplaySteps(events);
   const agentBoard = deriveAgentBoard(events);
   const askHarnessIntent = buildCommandActionIntent('ask-harness');
-  const runtimeActionReadiness = normalizeRuntimeActionReadiness(runtimeActionReadinessInput ?? DEFAULT_RUNTIME_ACTION_READINESS);
-  const runtimeActionReadinessCopy = runtimeActionReadinessMessage(runtimeActionReadiness);
+  const runtimeActionReadiness = runtimeActionReadinessIndicator(runtimeActionReadinessInput ?? DEFAULT_RUNTIME_ACTION_READINESS);
+  const askHarnessPreview = runtimeActionPreview(toRuntimeActionRequest(askHarnessIntent));
   const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
   const duration = formatDuration(events);
 
@@ -146,16 +147,16 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock', runtimeAc
             role="status"
             aria-label="Runtime action readiness"
             style={{
-              border: '1px solid #3f2a14',
+              border: `1px solid ${readinessToneStyles[runtimeActionReadiness.tone].border}`,
               borderRadius: '10px',
-              background: 'rgba(120, 53, 15, 0.18)',
+              background: readinessToneStyles[runtimeActionReadiness.tone].background,
               padding: '10px 12px',
-              color: '#fbbf24',
+              color: readinessToneStyles[runtimeActionReadiness.tone].color,
               fontSize: '12px',
               marginBottom: '10px',
             }}
           >
-            {runtimeActionReadinessCopy}
+            <strong>{runtimeActionReadiness.label}</strong> — {runtimeActionReadiness.detail}
           </div>
           <div style={{
             border: '1px solid #23233a',
@@ -165,6 +166,7 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock', runtimeAc
             color: '#71717a',
             fontSize: '12px',
           }}>
+            <div style={{ color: '#9ca3af', marginBottom: '6px' }}>Preview: {askHarnessPreview}</div>
             Read-only dock placeholder. Next cycles will connect approvals, replay controls, and live agent commands.
           </div>
         </section>
@@ -184,6 +186,13 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock', runtimeAc
     </div>
   );
 }
+
+const readinessToneStyles = {
+  muted: { border: '#27272a', background: 'rgba(63, 63, 70, 0.18)', color: '#a1a1aa' },
+  danger: { border: '#7f1d1d', background: 'rgba(127, 29, 29, 0.2)', color: '#fca5a5' },
+  warning: { border: '#3f2a14', background: 'rgba(120, 53, 15, 0.18)', color: '#fbbf24' },
+  success: { border: '#14532d', background: 'rgba(20, 83, 45, 0.18)', color: '#86efac' },
+} as const;
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (

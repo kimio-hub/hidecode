@@ -41,9 +41,11 @@ describe('Dashboard', () => {
   it('surfaces runtime action readiness as unavailable without enabling controls', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
 
+    expect(screen.getByRole('status', { name: 'Runtime action readiness' })).toHaveTextContent('Offline');
     expect(screen.getByRole('status', { name: 'Runtime action readiness' })).toHaveTextContent(
       'Runtime actions unavailable: backend not configured',
     );
+    expect(screen.getByText('Preview: command.ask-harness → command')).toBeInTheDocument();
     expect(screen.getByText(/read-only dock placeholder/i)).toBeInTheDocument();
 
     const askHarnessButton = screen.getByRole('button', { name: 'Ask Harness' });
@@ -68,6 +70,7 @@ describe('Dashboard', () => {
       />,
     );
 
+    expect(screen.getByRole('status', { name: 'Runtime action readiness' })).toHaveTextContent('Preview only');
     expect(screen.getByRole('status', { name: 'Runtime action readiness' })).toHaveTextContent(
       'Runtime actions preview only: Runtime actions are visible for preview while submission remains policy-gated.',
     );
