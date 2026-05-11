@@ -6,13 +6,30 @@ interface Props {
   events: TraceEvent[];
 }
 
+interface ToolPair {
+  call: TraceEvent;
+  result?: TraceEvent;
+}
+
+interface NormalizedToolDetails {
+  toolName: string;
+  risk?: string;
+  ok?: boolean;
+  summary?: string;
+  duration?: number;
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+  sandboxSummary?: string;
+}
+
 export default function ToolTimeline({ events }: Props) {
   const toolPairs = buildToolPairs(events);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {toolPairs.map((pair, i) => (
-        <ToolEntry key={i} call={pair.call} result={pair.result} index={i + 1} />
+        <ToolEntry key={pair.call.eventId || i} call={pair.call} result={pair.result} index={i + 1} />
       ))}
       {toolPairs.length === 0 && (
         <div style={{ color: '#555', fontSize: '12px', padding: '8px' }}>No tool calls yet</div>
@@ -21,34 +38,40 @@ export default function ToolTimeline({ events }: Props) {
   );
 }
 
-function buildToolPairs(events: TraceEvent[]) {
-  const pairs: { call: TraceEvent; result?: TraceEvent }[] = [];
-  const calls = events.filter(e => e.type === 'tool.call');
-  const results = events.filter(e => e.type === 'tool.result');
+function buildToolPairs(events: TraceEvent[]): ToolPair[] {
+  const pairs: ToolPair[] = [];
+  const calls = events.filter(e => e.type === 'tool.call' || e.type === 'tool.requested');
+  const results = events.filter(e => e.type === 'tool.result' || e.type === 'tool.finished');
+  const usedResults = new Set<string>();
 
   for (const call of calls) {
-    const matchingResult = results.find(r => {
-      const callTime = new Date(call.timestamp).getTime();
-      const resultTime = new Date(r.timestamp).getTime();
-      return resultTime > callTime && resultTime - callTime < 10000;
+    const matchingResult = results.find(result => {
+      if (usedResults.has(result.eventId)) return false;
+
+      const callToolName = explicitToolNameFor(call);
+      const resultToolName = explicitToolNameFor(result);
+      if (callToolName && resultToolName && callToolName !== resultToolName) return false;
+
+      const callTime = parseTimestampMs(call.timestamp);
+      const resultTime = parseTimestampMs(result.timestamp);
+      if (callTime === null || resultTime === null) return true;
+      return resultTime >= callTime && resultTime - callTime < 60000;
     });
+
+    if (matchingResult) usedResults.add(matchingResult.eventId);
     pairs.push({ call, result: matchingResult });
   }
+
   return pairs;
 }
 
 function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEvent; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const data = call.data as Record<string, unknown>;
-  const toolName = data.name as string;
-  const risk = data.risk as string;
-  const resultData = result?.data as Record<string, unknown> | undefined;
-  const ok = resultData?.ok as boolean | undefined;
-  const summary = resultData?.summary as string | undefined;
-  const duration = resultData?.durationMs as number | undefined;
+  const details = normalizeToolDetails(call, result);
 
-  const riskColor = risk === 'critical' ? '#f87171' : risk === 'high' ? '#fb923c' : risk === 'medium' ? '#facc15' : '#4ade80';
-  const statusColor = ok === false ? '#f87171' : ok === true ? '#4ade80' : '#555';
+  const riskColor = details.risk === 'critical' ? '#f87171' : details.risk === 'high' ? '#fb923c' : details.risk === 'medium' ? '#facc15' : '#4ade80';
+  const statusColor = details.ok === false ? '#f87171' : details.ok === true ? '#4ade80' : '#555';
 
   return (
     <div style={{
@@ -70,17 +93,17 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
       >
         {expanded ? <ChevronDown size={14} color="#555" /> : <ChevronRight size={14} color="#555" />}
         <span style={{ color: '#555', fontVariantNumeric: 'tabular-nums', minWidth: '20px' }}>#{index}</span>
-        <ToolIcon name={toolName} />
-        <span style={{ fontWeight: 600, color: '#e0e0e8' }}>{toolName}</span>
+        <ToolIcon name={details.toolName} />
+        <span style={{ fontWeight: 600, color: '#e0e0e8' }}>{details.toolName}</span>
         <div style={{
           width: '6px', height: '6px', borderRadius: '50%',
           background: riskColor, flexShrink: 0,
         }} />
         <div style={{ flex: 1 }} />
-        {duration !== undefined && (
-          <span style={{ color: '#555', fontVariantNumeric: 'tabular-nums' }}>{duration}ms</span>
+        {details.duration !== undefined && (
+          <span style={{ color: '#555', fontVariantNumeric: 'tabular-nums' }}>{details.duration}ms</span>
         )}
-        {ok !== undefined && (
+        {details.ok !== undefined && (
           <div style={{
             width: '6px', height: '6px', borderRadius: '50%',
             background: statusColor,
@@ -94,7 +117,9 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
           borderTop: '1px solid #1a1a2a',
           fontSize: '11px',
         }}>
-          {summary && <div style={{ color: '#aaa', marginBottom: '6px' }}>{summary}</div>}
+          {details.summary && <div style={{ color: '#aaa', marginBottom: '6px' }}>{details.summary}</div>}
+          {details.error && <div style={{ color: '#f87171', marginBottom: '6px' }}>{details.error}</div>}
+          {details.sandboxSummary && <div style={{ color: '#fbbf24', marginBottom: '6px' }}>{details.sandboxSummary}</div>}
           {data.input !== undefined && (
             <div style={{
               background: '#0a0a12',
@@ -109,7 +134,7 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
               {JSON.stringify(data.input, null, 2)}
             </div>
           )}
-          {typeof resultData?.stdout === 'string' && (
+          {(details.stdout || details.stderr) && (
             <div style={{
               background: '#0a0a12',
               borderRadius: '4px',
@@ -117,18 +142,75 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
               marginTop: '6px',
               fontFamily: 'monospace',
               fontSize: '11px',
-              color: ok === false ? '#f87171' : '#4ade80',
+              color: details.ok === false ? '#f87171' : '#4ade80',
               whiteSpace: 'pre-wrap',
               maxHeight: '120px',
               overflow: 'auto',
             }}>
-              {resultData.stdout as string}
+              {[details.stdout, details.stderr].filter(Boolean).join('\n')}
             </div>
           )}
         </div>
       )}
     </div>
   );
+}
+
+function normalizeToolDetails(call: TraceEvent, result?: TraceEvent): NormalizedToolDetails {
+  const callData = call.data as Record<string, unknown>;
+  const resultData = result?.data as Record<string, unknown> | undefined;
+  const output = typeof resultData?.output === 'object' && resultData.output !== null ? resultData.output as Record<string, unknown> : {};
+  const sandbox = typeof resultData?.sandbox === 'object' && resultData.sandbox !== null ? resultData.sandbox as Record<string, unknown> : undefined;
+
+  return {
+    toolName: toolNameFor(call) || toolNameFor(result) || 'tool',
+    risk: riskFor(callData),
+    ok: typeof resultData?.ok === 'boolean' ? resultData.ok : undefined,
+    summary: stringField(resultData?.summary),
+    duration: numberField(resultData?.durationMs),
+    stdout: stringField(resultData?.stdout) ?? stringField(output.stdout),
+    stderr: stringField(resultData?.stderr) ?? stringField(output.stderr),
+    error: stringField(resultData?.error),
+    sandboxSummary: sandbox ? sandboxSummary(sandbox) : undefined,
+  };
+}
+
+function toolNameFor(event?: TraceEvent): string {
+  return explicitToolNameFor(event) ?? 'tool';
+}
+
+function explicitToolNameFor(event?: TraceEvent): string | undefined {
+  const data = event?.data as Record<string, unknown> | undefined;
+  return stringField(data?.name) ?? stringField(data?.tool);
+}
+
+function riskFor(data: Record<string, unknown>): string | undefined {
+  const risk = stringField(data.risk);
+  if (risk) return risk;
+  const risks = Array.isArray(data.risks) ? data.risks.filter((item): item is string => typeof item === 'string') : [];
+  if (risks.some(item => /critical/i.test(item))) return 'critical';
+  if (risks.some(item => /write|network|shell|exec|delete|danger/i.test(item))) return 'high';
+  return risks.length > 0 ? 'medium' : undefined;
+}
+
+function sandboxSummary(sandbox: Record<string, unknown>): string {
+  const mode = stringField(sandbox.mode);
+  const writeMode = stringField(sandbox.writeMode);
+  const blocked = typeof sandbox.blocked === 'boolean' ? `blocked=${sandbox.blocked}` : undefined;
+  return [mode ? `mode=${mode}` : undefined, writeMode ? `writeMode=${writeMode}` : undefined, blocked].filter(Boolean).join(' · ');
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function parseTimestampMs(timestamp: string): number | null {
+  const value = new Date(timestamp).getTime();
+  return Number.isFinite(value) ? value : null;
 }
 
 function ToolIcon({ name }: { name: string }) {
