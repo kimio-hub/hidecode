@@ -1,16 +1,38 @@
+import { useState } from 'react';
+
 interface MessageComposerProps {
   onReview?: () => void;
+  onSubmitMessage?: (content: string) => Promise<void> | void;
+  disabled?: boolean;
 }
 
-export default function MessageComposer({ onReview }: MessageComposerProps) {
+export default function MessageComposer({ onReview, onSubmitMessage, disabled = false }: MessageComposerProps) {
+  const [content, setContent] = useState('');
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = content.trim();
+    if (!trimmed || disabled) return;
+    await onSubmitMessage?.(trimmed);
+    setContent('');
+  }
+
   return (
-    <form aria-label="Message composer" style={styles.composer}>
-      <textarea aria-label="Message hidecode" placeholder="Ask hidecode to fix, explain, review, or plan…" style={styles.textarea} />
+    <form aria-label="Message composer" onSubmit={handleSubmit} style={styles.composer}>
+      <textarea
+        aria-label="Message hidecode"
+        disabled={disabled}
+        onChange={(event) => setContent(event.target.value)}
+        placeholder="Ask hidecode to fix, explain, review, or plan…"
+        style={styles.textarea}
+        value={content}
+      />
       <div style={styles.actions}>
         {['Run', 'Plan', 'Review', 'Stop'].map((action) => (
           <button
             key={action}
-            type="button"
+            disabled={disabled && action === 'Run'}
+            type={action === 'Run' ? 'submit' : 'button'}
             onClick={action === 'Review' ? onReview : undefined}
             style={action === 'Run' ? styles.primaryButton : styles.secondaryButton}
           >

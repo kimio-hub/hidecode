@@ -91,10 +91,12 @@ describe('local backend skeleton', () => {
     const eventsBody = await json(eventsResponse);
 
     expect(eventsResponse.status).toBe(200);
-    expect(eventsBody.events).toEqual([
+    expect(eventsBody.events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'session.created', sessionId }),
       expect.objectContaining({ type: 'chat.message.created', sessionId }),
-    ]);
+      expect.objectContaining({ type: 'runtime.task.started', sessionId }),
+      expect.objectContaining({ type: 'runtime.task.finished', sessionId }),
+    ]));
   });
 
   it('rejects encoded traversal attempts in session ids', async () => {

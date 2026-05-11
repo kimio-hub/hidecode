@@ -27,6 +27,7 @@ type LoadState =
 export default function App() {
   const source = useMemo(() => parseDashboardSource(window.location.search), []);
   const [appSearch, setAppSearch] = useState(window.location.search);
+  const [chatEvents, setChatEvents] = useState<TraceEvent[]>([]);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
     if (source.kind === 'mock') {
@@ -103,8 +104,10 @@ export default function App() {
     return <Dashboard events={state.events} run={state.run} sourceLabel={state.sourceLabel} />;
   }
 
-  const shellEvents = state.status === 'ready' ? state.events : MOCK_EVENTS;
   const appState = parseHidecodeAppState(appSearch);
+  const shellEvents = appState.mode === 'chat' && chatEvents.length > 0
+    ? chatEvents
+    : state.status === 'ready' ? state.events : MOCK_EVENTS;
   const navigateToReview = () => {
     window.history.pushState(null, '', '?mode=review');
     setAppSearch('?mode=review');
@@ -112,7 +115,7 @@ export default function App() {
   const workspace = appState.mode === 'review'
     ? <ReviewWorkspace />
     : appState.mode === 'chat'
-      ? <ChatWorkspace onReview={navigateToReview} />
+      ? <ChatWorkspace onEventsChange={setChatEvents} onReview={navigateToReview} />
       : <HomePage />;
 
   return (

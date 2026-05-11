@@ -8,6 +8,7 @@ import {
   handleGetSession,
   handleListEvents,
   handleListSessions,
+  handleStreamEvents,
 } from './routes/sessions.js';
 import { JsonStore } from './storage.js';
 
@@ -40,7 +41,7 @@ export function createServer(options: ServerOptions): AppServer {
         return methodNotAllowed(request.method);
       }
 
-      const sessionMatch = /^\/api\/sessions\/([^/]+)(?:\/(messages|events))?$/.exec(pathname);
+      const sessionMatch = /^\/api\/sessions\/([^/]+)(?:\/(messages|events|stream))?$/.exec(pathname);
       if (sessionMatch) {
         const [, sessionId, child] = sessionMatch;
         if (!sessionId) return notFound(pathname);
@@ -58,6 +59,11 @@ export function createServer(options: ServerOptions): AppServer {
         if (child === 'events') {
           if (request.method !== 'GET') return methodNotAllowed(request.method);
           return handleListEvents(store, sessionId);
+        }
+
+        if (child === 'stream') {
+          if (request.method !== 'GET') return methodNotAllowed(request.method);
+          return handleStreamEvents(store, sessionId);
         }
       }
 

@@ -11,7 +11,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@world-harness/core": "workspace:*",
+    "@world-harness/models": "workspace:*",
+    "@world-harness/orchestrator": "workspace:*",
+    "@world-harness/policy": "workspace:*",
+    "@world-harness/tools": "workspace:*"
+  },
   "exports": {
+    "./src/index.js": "./src/index.ts",
     ".": "./src/index.ts"
   }
 }

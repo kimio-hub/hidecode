@@ -1,6 +1,8 @@
 import type { JsonStore } from '../storage.js';
 import { UnsafeSessionIdError } from '../storage.js';
 import { jsonResponse, readJsonObject } from '../http.js';
+import { runSessionTask, type RunSessionTaskOptions } from '../runtime/run-session-task.js';
+import { encodeSessionEventsAsSse } from '../runtime/session-events.js';
 
 export type SessionMessageRole = 'user' | 'assistant' | 'system';
 
@@ -27,6 +29,18 @@ export interface SessionRecord {
   updatedAt: string;
   messages: SessionMessage[];
   events: SessionEvent[];
+  runs?: SessionRun[];
+}
+
+export interface SessionRun {
+  id: string;
+  ok: boolean;
+  summary: string;
+  tracePath: string;
+  reportPath: string;
+  steps: number;
+  durationMs: number;
+  createdAt: string;
 }
 
 export async function handleListSessions(store: JsonStore): Promise<Response> {
@@ -91,7 +105,25 @@ export async function handleCreateMessage(store: JsonStore, sessionId: string, r
   session.updatedAt = now;
 
   await writeSession(store, session);
-  return jsonResponse({ message, session }, { status: 201 });
+
+  const runtimeOptions = parseRuntimeOptions(body, session.id, session.projectPath, content);
+  let runtimeResult: Awaited<ReturnType<typeof runSessionTask>> | undefined;
+  try {
+    runtimeResult = await runSessionTask(runtimeOptions);
+    session.events.push(...runtimeResult.events);
+    session.runs = [...(session.runs ?? []), toSessionRun(runtimeResult.run)];
+    session.updatedAt = new Date().toISOString();
+  } catch (error) {
+    session.events.push(makeEvent(session.id, 'runtime.task.failed', {
+      message: error instanceof Error ? error.message : String(error),
+    }));
+    session.updatedAt = new Date().toISOString();
+    await writeSession(store, session);
+    throw error;
+  }
+
+  await writeSession(store, session);
+  return jsonResponse({ message, session, run: runtimeResult?.run }, { status: 201 });
 }
 
 export async function handleListEvents(store: JsonStore, sessionId: string): Promise<Response> {
@@ -100,6 +132,58 @@ export async function handleListEvents(store: JsonStore, sessionId: string): Pro
     return jsonResponse({ error: 'session_not_found', sessionId }, { status: 404 });
   }
   return jsonResponse({ events: session.events });
+}
+
+export async function handleStreamEvents(store: JsonStore, sessionId: string): Promise<Response> {
+  const session = await readSession(store, sessionId);
+  if (!session) {
+    return jsonResponse({ error: 'session_not_found', sessionId }, { status: 404 });
+  }
+
+  return new Response(encodeSessionEventsAsSse(session.events), {
+    headers: {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+    },
+  });
+}
+
+function parseRuntimeOptions(body: Record<string, unknown>, sessionId: string, projectPath: string, message: string): RunSessionTaskOptions {
+  const runtime = body.runtime;
+  if (!runtime || typeof runtime !== 'object' || Array.isArray(runtime)) {
+    return { sessionId, projectPath, message, model: 'scripted', maxSteps: 3 };
+  }
+
+  const runtimeBody = runtime as Record<string, unknown>;
+  const model = runtimeBody.model === 'openai' ? 'openai' : 'scripted';
+  const maxSteps = typeof runtimeBody.maxSteps === 'number' && Number.isInteger(runtimeBody.maxSteps) && runtimeBody.maxSteps > 0
+    ? runtimeBody.maxSteps
+    : 3;
+
+  return {
+    sessionId,
+    projectPath,
+    message,
+    model,
+    maxSteps,
+    modelName: typeof runtimeBody.modelName === 'string' ? runtimeBody.modelName : undefined,
+    baseUrl: typeof runtimeBody.baseUrl === 'string' ? runtimeBody.baseUrl : undefined,
+    apiKey: typeof runtimeBody.apiKey === 'string' ? runtimeBody.apiKey : undefined,
+  };
+}
+
+function toSessionRun(run: Awaited<ReturnType<typeof runSessionTask>>['run']): SessionRun {
+  return {
+    id: run.tracePath,
+    ok: run.ok,
+    summary: run.summary,
+    tracePath: run.tracePath,
+    reportPath: run.reportPath,
+    steps: run.steps,
+    durationMs: run.durationMs,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 async function ensureSessionsDir(store: JsonStore): Promise<void> {
