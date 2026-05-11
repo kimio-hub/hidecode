@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DashboardActionIntent, ReplayActionIntent, RuntimeActionResponse } from './actions';
 import {
   buildAgentActionIntent,
@@ -479,5 +479,165 @@ describe('Dashboard runtime action intents', () => {
       accepted: false,
       reason: 'Duplicate commandId; original trace event returned.',
     });
+  });
+});
+
+describe('Dashboard runtime action provisional backend contract fixtures', () => {
+  const fakeSecret = 'FAKE_SENTINEL_SECRET_DO_NOT_USE_12345';
+  const readinessFixtures = {
+    online: {
+      state: 'online',
+      canSubmitActions: true,
+      reason: 'Runtime action backend is online and contract-compatible.',
+      checkedAt: '2026-05-11T00:02:00.000Z',
+      backendVersion: 'runtime-1.0.0',
+      contractVersion: 'dashboard-runtime-actions.v1',
+    },
+    previewOnlyOnline: {
+      state: 'online',
+      canSubmitActions: true,
+      reason: `Runtime action backend returned preview-only policy for token ${fakeSecret}.`,
+      checkedAt: '2026-05-11T00:03:00.000Z',
+      backendVersion: 'runtime-preview.0',
+      contractVersion: 'dashboard-runtime-actions.preview',
+    },
+    offline: {
+      state: 'offline',
+      canSubmitActions: true,
+      reason: 'Dashboard runtime actions backend is unreachable.',
+      checkedAt: '2026-05-11T00:04:00.000Z',
+      backendVersion: 'runtime-0.1.0',
+      contractVersion: 'dashboard-runtime-actions.v1',
+      lastError: `Connection failed with bearer ${fakeSecret}.`,
+    },
+    malformed: {
+      state: 'offline',
+      canSubmitActions: true,
+      reason: `Malformed readiness leaked ${fakeSecret}.`,
+      contractVersion: 'dashboard-runtime-actions.v1',
+      lastError: `stack trace contained ${fakeSecret}`,
+    },
+  } as const;
+
+  const actionResponseFixtures = {
+    accepted: {
+      status: 'accepted',
+      accepted: true,
+      commandId: 'command-fixture-accepted',
+      traceEventId: 'trace-fixture-accepted',
+      queuedOperationId: 'operation-fixture-accepted',
+    },
+    rejected: {
+      status: 'rejected',
+      accepted: false,
+      commandId: 'command-fixture-rejected',
+      traceEventId: 'trace-fixture-rejected',
+      reason: `Rejected by policy check for apiKey=${fakeSecret}.`,
+    },
+    duplicate: {
+      status: 'duplicate',
+      accepted: false,
+      commandId: 'command-fixture-stable',
+      traceEventId: 'trace-fixture-stable',
+      reason: 'Duplicate commandId; original trace event returned.',
+    },
+    malformed: {
+      status: 'accepted',
+      accepted: false,
+      commandId: 'command-fixture-malformed',
+      traceEventId: 'trace-fixture-malformed',
+      reason: `Malformed response with ${fakeSecret}.`,
+    },
+  } as const;
+
+  it('normalizes readiness fixtures into the provisional contract without enabling preview/offline controls', () => {
+    expect(normalizeRuntimeActionReadiness(readinessFixtures.online)).toEqual(readinessFixtures.online);
+    expect(runtimeActionReadinessIndicator(readinessFixtures.online)).toMatchObject({ label: 'Ready', tone: 'success' });
+
+    expect(normalizeRuntimeActionReadiness(readinessFixtures.previewOnlyOnline)).toEqual({
+      state: 'online',
+      canSubmitActions: false,
+      reason: 'Runtime action backend returned preview-only policy for token [REDACTED].',
+      checkedAt: '2026-05-11T00:03:00.000Z',
+      backendVersion: 'runtime-preview.0',
+    });
+
+    expect(normalizeRuntimeActionReadiness(readinessFixtures.offline)).toEqual({
+      state: 'offline',
+      canSubmitActions: false,
+      reason: 'Dashboard runtime actions backend is unreachable.',
+      checkedAt: '2026-05-11T00:04:00.000Z',
+      backendVersion: 'runtime-0.1.0',
+      contractVersion: 'dashboard-runtime-actions.v1',
+      lastError: 'Connection failed with bearer [REDACTED].',
+    });
+
+    expect(normalizeRuntimeActionReadiness(readinessFixtures.malformed)).toEqual({
+      state: 'offline',
+      canSubmitActions: false,
+      reason: 'Malformed readiness leaked [REDACTED].',
+      contractVersion: 'dashboard-runtime-actions.v1',
+      lastError: 'stack trace contained [REDACTED]',
+    });
+  });
+
+  it('normalizes action response fixtures with strict accepted, rejected, duplicate, and malformed semantics', () => {
+    expect(normalizeRuntimeActionResponse(actionResponseFixtures.accepted)).toEqual(actionResponseFixtures.accepted);
+
+    expect(normalizeRuntimeActionResponse(actionResponseFixtures.rejected)).toEqual({
+      status: 'rejected',
+      accepted: false,
+      commandId: 'command-fixture-rejected',
+      traceEventId: 'trace-fixture-rejected',
+      reason: 'Rejected by policy check for apiKey=[REDACTED].',
+    });
+
+    const duplicate = normalizeRuntimeActionResponse(actionResponseFixtures.duplicate);
+    expect(duplicate).toEqual({
+      status: 'duplicate',
+      accepted: false,
+      commandId: 'command-fixture-stable',
+      traceEventId: 'trace-fixture-stable',
+      reason: 'Duplicate commandId; original trace event returned.',
+    });
+    expect(duplicate?.commandId).toBe(actionResponseFixtures.duplicate.commandId);
+    expect(duplicate?.traceEventId).toBe(actionResponseFixtures.duplicate.traceEventId);
+
+    expect(normalizeRuntimeActionResponse(actionResponseFixtures.malformed)).toBeUndefined();
+  });
+
+  it('keeps fixture consumption side-effect-free and controls disabled/read-only', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const WebSocketCtor = globalThis.WebSocket;
+    const localStorageRef = globalThis.localStorage;
+
+    const intents = [
+      buildApprovalActionIntent('approve', 'approval-fixture'),
+      buildReplayActionIntent('replay', { kind: 'replay-step', id: 'step-fixture' }),
+      buildAgentActionIntent('handoff', 'agent-fixture'),
+      buildCommandActionIntent('ask-harness'),
+    ];
+
+    for (const intent of intents) {
+      expect(intent.enabled).toBe(false);
+      expect(intent.requiresBackend).toBe(true);
+      expect(actionReasonAttributes(intent)).toEqual({ title: intent.reason, 'aria-description': intent.reason });
+      expect(toRuntimeActionRequest(intent).requiresBackend).toBe(true);
+    }
+
+    normalizeRuntimeActionReadiness(readinessFixtures.online);
+    normalizeRuntimeActionResponse(actionResponseFixtures.accepted);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(timeoutSpy).not.toHaveBeenCalled();
+    expect(intervalSpy).not.toHaveBeenCalled();
+    expect(globalThis.WebSocket).toBe(WebSocketCtor);
+    expect(globalThis.localStorage).toBe(localStorageRef);
+
+    fetchSpy.mockRestore();
+    timeoutSpy.mockRestore();
+    intervalSpy.mockRestore();
   });
 });

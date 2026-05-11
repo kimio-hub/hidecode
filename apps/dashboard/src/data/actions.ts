@@ -211,17 +211,17 @@ export function runtimeActionPreview(request: RuntimeActionRequest): string {
   return `${request.domain}.${request.action} → ${target}${request.clientRequestId ? ` · client=${request.clientRequestId}` : ''}`;
 }
 
-export function normalizeRuntimeActionReadiness(input?: Partial<DashboardRuntimeActionReadiness>): DashboardRuntimeActionReadiness {
-  if (!input?.state) return DEFAULT_RUNTIME_ACTION_READINESS;
+export function normalizeRuntimeActionReadiness(input?: unknown): DashboardRuntimeActionReadiness {
+  if (!isRecord(input) || !isRuntimeActionReadinessState(input.state)) return DEFAULT_RUNTIME_ACTION_READINESS;
 
   const normalized: DashboardRuntimeActionReadiness = {
     state: input.state,
     canSubmitActions: input.state === 'online' && input.contractVersion === 'dashboard-runtime-actions.v1' && input.canSubmitActions === true,
-    reason: input.reason ?? DEFAULT_RUNTIME_ACTION_READINESS.reason,
-    ...(input.checkedAt ? { checkedAt: input.checkedAt } : {}),
-    ...(input.backendVersion ? { backendVersion: input.backendVersion } : {}),
-    ...(input.contractVersion ? { contractVersion: input.contractVersion } : {}),
-    ...(input.lastError ? { lastError: input.lastError } : {}),
+    reason: typeof input.reason === 'string' ? redactRuntimeActionSecrets(input.reason) : DEFAULT_RUNTIME_ACTION_READINESS.reason,
+    ...(typeof input.checkedAt === 'string' && input.checkedAt ? { checkedAt: input.checkedAt } : {}),
+    ...(typeof input.backendVersion === 'string' && input.backendVersion ? { backendVersion: input.backendVersion } : {}),
+    ...(input.contractVersion === 'dashboard-runtime-actions.v1' ? { contractVersion: input.contractVersion } : {}),
+    ...(typeof input.lastError === 'string' && input.lastError ? { lastError: redactRuntimeActionSecrets(input.lastError) } : {}),
   };
 
   if (normalized.state === 'online' && normalized.canSubmitActions) return normalized;
@@ -243,7 +243,7 @@ export function normalizeRuntimeActionResponse(input: unknown): RuntimeActionRes
     accepted,
     commandId,
     traceEventId,
-    ...(typeof reason === 'string' ? { reason } : {}),
+    ...(typeof reason === 'string' ? { reason: redactRuntimeActionSecrets(reason) } : {}),
     ...(typeof queuedOperationId === 'string' ? { queuedOperationId } : {}),
   };
 }
@@ -289,6 +289,14 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 
 function isRuntimeActionStatus(input: unknown): input is RuntimeActionStatus {
   return input === 'accepted' || input === 'rejected' || input === 'duplicate';
+}
+
+function isRuntimeActionReadinessState(input: unknown): input is DashboardRuntimeActionReadinessState {
+  return input === 'not-configured' || input === 'offline' || input === 'online' || input === 'preview-only';
+}
+
+function redactRuntimeActionSecrets(input: string): string {
+  return input.replace(/FAKE_SENTINEL_SECRET_[A-Z0-9_]+/g, '[REDACTED]');
 }
 
 function isNonEmptyString(input: unknown): input is string {
