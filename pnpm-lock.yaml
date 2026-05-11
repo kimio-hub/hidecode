@@ -113,6 +113,8 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.18)(jsdom@29.1.1)(lightningcss@1.32.0)
 
+  apps/server: {}
+
   packages/core:
     dependencies:
       zod:
