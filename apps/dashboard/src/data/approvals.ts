@@ -66,8 +66,11 @@ function approvalItem(event: TraceEvent): ApprovalQueueItem {
 
 function approvalStatus(decision: string, isResolved: boolean): ApprovalStatus {
   if (!isResolved) return 'pending';
-  if (/allow|approve|grant/.test(decision)) return 'allowed';
-  if (/deny|denied|reject|block/.test(decision)) return 'denied';
+  const normalized = decision.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+  const allowed = new Set(['allow', 'allowed', 'approve', 'approved', 'grant', 'granted']);
+  const denied = new Set(['deny', 'denied', 'reject', 'rejected', 'block', 'blocked']);
+  if (allowed.has(normalized)) return 'allowed';
+  if (denied.has(normalized)) return 'denied';
   return 'informational';
 }
 

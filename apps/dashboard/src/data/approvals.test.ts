@@ -143,4 +143,23 @@ describe('deriveApprovalQueue', () => {
       summary: 'Unsafe command',
     });
   });
+
+  it('keeps unknown resolved approval decisions informational instead of substring matching', () => {
+    const items = deriveApprovalQueue([
+      event({
+        eventId: 'approval-unknown',
+        type: 'approval.resolved',
+        data: { tool: 'write_file', decision: 'disallowed', summary: 'Not a canonical resolution', risk: 'medium' },
+      }),
+    ]);
+
+    expect(items[0]).toMatchObject({
+      id: 'approval-unknown',
+      kind: 'approval',
+      risk: 'medium',
+      status: 'informational',
+      title: 'Approval resolved: write_file',
+      summary: 'Not a canonical resolution',
+    });
+  });
 });
