@@ -14,6 +14,15 @@ export interface DashboardActionTarget {
   id?: string;
 }
 
+export type ReplayStepActionTarget = DashboardActionTarget & { kind: 'replay-step'; id: string };
+export type RunActionTarget = DashboardActionTarget & { kind: 'run' };
+
+export interface ReplayActionTargetByAction {
+  replay: ReplayStepActionTarget | RunActionTarget;
+  fork: RunActionTarget;
+  'save-eval': RunActionTarget;
+}
+
 interface BaseDashboardActionIntent {
   id: string;
   label: string;
@@ -24,9 +33,17 @@ interface BaseDashboardActionIntent {
   target?: DashboardActionTarget;
 }
 
+export type ReplayActionIntent = {
+  [Action in ReplayAction]: BaseDashboardActionIntent & {
+    domain: 'replay';
+    action: Action;
+    target: ReplayActionTargetByAction[Action];
+  };
+}[ReplayAction];
+
 export type DashboardActionIntent =
   | (BaseDashboardActionIntent & { domain: 'approval'; action: ApprovalAction; target: DashboardActionTarget & { kind: 'approval'; id: string }; targetId: string })
-  | (BaseDashboardActionIntent & { domain: 'replay'; action: ReplayAction; target?: DashboardActionTarget & { kind: 'replay-step' | 'run' } })
+  | ReplayActionIntent
   | (BaseDashboardActionIntent & { domain: 'agent'; action: AgentAction; target: DashboardActionTarget & { kind: 'agent'; id: string }; targetId: string })
   | (BaseDashboardActionIntent & { domain: 'command'; action: CommandAction; target: DashboardActionTarget & { kind: 'command' } });
 
@@ -71,9 +88,12 @@ export function buildApprovalActionIntent(action: ApprovalAction, targetId: stri
   return disabledIntent('approval', action, approvalLabels[action], BACKEND_REASON, { kind: 'approval', id: targetId });
 }
 
-export function buildReplayActionIntent(action: ReplayAction, target?: string | (DashboardActionTarget & { kind: 'replay-step' | 'run' })): DashboardActionIntent {
-  const normalizedTarget = typeof target === 'string' ? { kind: 'replay-step' as const, id: target } : target;
-  return disabledIntent('replay', action, replayLabels[action], BACKEND_REASON, normalizedTarget);
+export function buildReplayActionIntent(action: 'replay', target?: string | ReplayActionTargetByAction['replay']): ReplayActionIntent & { action: 'replay' };
+export function buildReplayActionIntent(action: 'fork', target?: ReplayActionTargetByAction['fork']): ReplayActionIntent & { action: 'fork' };
+export function buildReplayActionIntent(action: 'save-eval', target?: ReplayActionTargetByAction['save-eval']): ReplayActionIntent & { action: 'save-eval' };
+export function buildReplayActionIntent(action: ReplayAction, target?: string | ReplayActionTargetByAction[ReplayAction]): ReplayActionIntent {
+  const normalizedTarget = normalizeReplayActionTarget(target);
+  return disabledIntent('replay', action, replayLabels[action], BACKEND_REASON, normalizedTarget) as ReplayActionIntent;
 }
 
 export function buildAgentActionIntent(action: AgentAction, targetId: string): DashboardActionIntent {
@@ -99,6 +119,12 @@ export function toRuntimeActionRequest(intent: DashboardActionIntent, clientRequ
     requiresBackend: intent.requiresBackend,
     ...(clientRequestId ? { clientRequestId } : {}),
   };
+}
+
+function normalizeReplayActionTarget(target?: string | ReplayActionTargetByAction[ReplayAction]): ReplayActionTargetByAction[ReplayAction] {
+  if (typeof target === 'string') return { kind: 'replay-step', id: target };
+  if (target) return target;
+  return { kind: 'run' };
 }
 
 function disabledIntent(
