@@ -6,6 +6,7 @@ import {
   buildCommandActionIntent,
   buildReplayActionIntent,
   actionReasonAttributes,
+  toRuntimeActionRequest,
 } from './actions';
 
 function expectDisabledBackendIntent(intent: DashboardActionIntent, expected: Partial<DashboardActionIntent>) {
@@ -99,6 +100,33 @@ describe('Dashboard runtime action intents', () => {
     expect(actionReasonAttributes(intent)).toEqual({
       title: intent.reason,
       'aria-description': intent.reason,
+    });
+  });
+
+  it('converts disabled intents into side-effect-free runtime action requests', () => {
+    const approvalRequest = toRuntimeActionRequest(buildApprovalActionIntent('approve', 'approval-1'));
+    expect(approvalRequest).toEqual({
+      domain: 'approval',
+      action: 'approve',
+      target: { kind: 'approval', id: 'approval-1' },
+      requiresBackend: true,
+    });
+
+    const replayRequest = toRuntimeActionRequest(buildReplayActionIntent('replay', { kind: 'replay-step', id: 'step-1' }), 'client-1');
+    expect(replayRequest).toEqual({
+      domain: 'replay',
+      action: 'replay',
+      target: { kind: 'replay-step', id: 'step-1' },
+      requiresBackend: true,
+      clientRequestId: 'client-1',
+    });
+
+    const commandRequest = toRuntimeActionRequest(buildCommandActionIntent('ask-harness'));
+    expect(commandRequest).toEqual({
+      domain: 'command',
+      action: 'ask-harness',
+      target: { kind: 'command' },
+      requiresBackend: true,
     });
   });
 });

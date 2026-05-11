@@ -22,6 +22,20 @@ All current intents have:
 
 ## Future backend boundary
 
+When backend support exists, browser controls should submit a `RuntimeActionRequest` derived from the current intent with `toRuntimeActionRequest(intent, clientRequestId)`. The helper is pure and performs no network calls; callers are responsible for generating idempotent `clientRequestId` values before submission.
+
+Base request envelope:
+
+```ts
+interface RuntimeActionRequest {
+  domain: 'approval' | 'replay' | 'agent' | 'command';
+  action: string;
+  target?: { kind: 'approval' | 'replay-step' | 'run' | 'agent' | 'command'; id?: string };
+  requiresBackend: true;
+  clientRequestId?: string;
+}
+```
+
 A future runtime action backend should provide explicit, auditable endpoints for:
 
 1. Resolving approvals: approve or reject a specific approval queue item.

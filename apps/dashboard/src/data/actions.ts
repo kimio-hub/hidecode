@@ -35,6 +35,14 @@ export interface DashboardActionReasonAttributes {
   'aria-description': string;
 }
 
+export interface RuntimeActionRequest {
+  domain: DashboardActionDomain;
+  action: DashboardAction;
+  target?: DashboardActionTarget;
+  requiresBackend: boolean;
+  clientRequestId?: string;
+}
+
 const BACKEND_REASON = 'Disabled until the Dashboard runtime backend API is available.';
 const COMMAND_REASON = 'Command submission is disabled until the Dashboard runtime backend API is available.';
 
@@ -80,6 +88,16 @@ export function actionReasonAttributes(intent: Pick<DashboardActionIntent, 'reas
   return {
     title: intent.reason,
     'aria-description': intent.reason,
+  };
+}
+
+export function toRuntimeActionRequest(intent: DashboardActionIntent, clientRequestId?: string): RuntimeActionRequest {
+  return {
+    domain: intent.domain,
+    action: intent.action,
+    ...(intent.target ? { target: intent.target } : {}),
+    requiresBackend: intent.requiresBackend,
+    ...(clientRequestId ? { clientRequestId } : {}),
   };
 }
 
