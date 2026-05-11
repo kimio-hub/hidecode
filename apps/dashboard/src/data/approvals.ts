@@ -24,6 +24,10 @@ const riskRank: Record<ApprovalRisk, number> = {
 
 export function deriveApprovalQueue(events: TraceEvent[]): ApprovalQueueItem[] {
   return events.flatMap(event => {
+    if (event.type === 'approval.requested' || event.type === 'approval.resolved') {
+      return [approvalItem(event)];
+    }
+
     if (event.type === 'policy.decision' || event.type === 'policy.decided') {
       return [policyItem(event)];
     }
@@ -43,6 +47,28 @@ export function deriveApprovalQueue(events: TraceEvent[]): ApprovalQueueItem[] {
 
     return [];
   });
+}
+
+function approvalItem(event: TraceEvent): ApprovalQueueItem {
+  const toolName = stringifySummary(event.data.tool ?? event.data.name ?? 'unknown');
+  const decision = String(event.data.decision ?? event.data.status ?? '').toLowerCase();
+  const isResolved = event.type === 'approval.resolved';
+  return {
+    id: event.eventId,
+    title: isResolved ? `Approval resolved: ${toolName}` : `Approval requested: ${toolName}`,
+    kind: 'approval',
+    risk: normalizeRisk(event.data.risk),
+    status: approvalStatus(decision, isResolved),
+    timestamp: event.timestamp,
+    summary: stringifySummary(event.data.reason ?? event.data.summary ?? event.data.message ?? 'Approval event recorded'),
+  };
+}
+
+function approvalStatus(decision: string, isResolved: boolean): ApprovalStatus {
+  if (!isResolved) return 'pending';
+  if (/allow|approve|grant/.test(decision)) return 'allowed';
+  if (/deny|denied|reject|block/.test(decision)) return 'denied';
+  return 'informational';
 }
 
 function policyItem(event: TraceEvent): ApprovalQueueItem {

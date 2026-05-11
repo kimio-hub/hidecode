@@ -86,4 +86,61 @@ describe('deriveApprovalQueue', () => {
     expect(items[0].summary).toContain('Readonly sandbox blocked write');
     expect(items[0].summary).toContain('writeMode=readonly');
   });
+
+  it('derives explicit orchestrator approval requests as pending approval items', () => {
+    const items = deriveApprovalQueue([
+      event({
+        eventId: 'approval-1',
+        type: 'approval.requested',
+        data: {
+          tool: 'execute_shell',
+          reason: 'Command requires write access',
+          risk: 'high',
+        },
+      }),
+    ]);
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        id: 'approval-1',
+        kind: 'approval',
+        risk: 'high',
+        status: 'pending',
+        title: 'Approval requested: execute_shell',
+        summary: 'Command requires write access',
+      }),
+    ]);
+  });
+
+  it('derives resolved orchestrator approvals as allowed or denied items', () => {
+    const items = deriveApprovalQueue([
+      event({
+        eventId: 'approval-allowed',
+        type: 'approval.resolved',
+        data: { tool: 'write_file', decision: 'approved', summary: 'Allowed by operator', risk: 'medium' },
+      }),
+      event({
+        eventId: 'approval-denied',
+        type: 'approval.resolved',
+        data: { tool: 'terminal', decision: 'denied', reason: 'Unsafe command', risk: 'critical' },
+      }),
+    ]);
+
+    expect(items[0]).toMatchObject({
+      id: 'approval-allowed',
+      kind: 'approval',
+      risk: 'medium',
+      status: 'allowed',
+      title: 'Approval resolved: write_file',
+      summary: 'Allowed by operator',
+    });
+    expect(items[1]).toMatchObject({
+      id: 'approval-denied',
+      kind: 'approval',
+      risk: 'critical',
+      status: 'denied',
+      title: 'Approval resolved: terminal',
+      summary: 'Unsafe command',
+    });
+  });
 });
