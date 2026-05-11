@@ -199,4 +199,168 @@ describe('Dashboard', () => {
     expect(screen.getByText('executor')).toBeInTheDocument();
     expect(screen.getAllByText('Orchestrator dashboard integration trace completed').length).toBeGreaterThanOrEqual(1);
   });
+
+  it('renders exact current orchestrator trace shape without enriched tool metadata', () => {
+    const run: RunMeta = {
+      runId: 'run-current-orchestrator',
+      taskId: 'task-current-orchestrator',
+      harnessVersion: '0.1.0-test',
+      model: { provider: 'scripted', name: 'scripted-local' },
+      summary: 'Current orchestrator trace completed',
+    };
+
+    const events: TraceEvent[] = [
+      {
+        eventId: 'current-1-task-created',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'task.created',
+        timestamp: '2026-05-11T13:00:00.000Z',
+        actor: 'orchestrator',
+        data: {
+          goal: 'Run exact current orchestrator trace through Dashboard',
+          mode: 'autonomous',
+          budget: '1/5 steps',
+        },
+      },
+      {
+        eventId: 'current-2-model-requested',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'model.requested',
+        timestamp: '2026-05-11T13:00:01.000Z',
+        actor: 'orchestrator',
+        data: { step: 0, budget: '1/5 steps' },
+      },
+      {
+        eventId: 'current-3-model-completed',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'model.completed',
+        timestamp: '2026-05-11T13:00:02.000Z',
+        actor: 'orchestrator',
+        data: { step: 0, kind: 'tool', budget: '1/5 steps' },
+      },
+      {
+        eventId: 'current-4-tool-requested',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'tool.requested',
+        timestamp: '2026-05-11T13:00:03.000Z',
+        actor: 'orchestrator',
+        data: {
+          tool: 'run',
+          input: { command: 'printf blocked > out.txt', cwd: '/tmp/world-harness-current-fixture' },
+          reasoning: 'Verify sandbox handling',
+        },
+      },
+      {
+        eventId: 'current-5-policy-decided',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'policy.decided',
+        timestamp: '2026-05-11T13:00:04.000Z',
+        actor: 'orchestrator',
+        data: { decision: 'allow', reason: 'allowed by test policy', matchedRule: 'execute' },
+      },
+      {
+        eventId: 'current-6-tool-started',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'tool.started',
+        timestamp: '2026-05-11T13:00:05.000Z',
+        actor: 'orchestrator',
+        data: { tool: 'run' },
+      },
+      {
+        eventId: 'current-7-tool-finished',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'tool.finished',
+        timestamp: '2026-05-11T13:00:06.000Z',
+        actor: 'orchestrator',
+        data: {
+          tool: 'run',
+          ok: false,
+          error: 'Readonly sandbox blocked write command',
+          evidence: [],
+          sandbox: { mode: 'local', writeMode: 'readonly', blocked: true },
+        },
+      },
+      {
+        eventId: 'current-8-sandbox-blocked',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'sandbox.blocked',
+        timestamp: '2026-05-11T13:00:07.000Z',
+        actor: 'orchestrator',
+        data: {
+          tool: 'run',
+          error: 'Readonly sandbox blocked write command',
+          sandbox: { mode: 'local', writeMode: 'readonly', blocked: true },
+        },
+      },
+      {
+        eventId: 'current-9-model-requested',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'model.requested',
+        timestamp: '2026-05-11T13:00:08.000Z',
+        actor: 'orchestrator',
+        data: { step: 1, budget: '2/5 steps' },
+      },
+      {
+        eventId: 'current-10-model-completed',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'model.completed',
+        timestamp: '2026-05-11T13:00:09.000Z',
+        actor: 'orchestrator',
+        data: { step: 1, kind: 'final', summary: 'readonly sandbox blocked write command', budget: '2/5 steps' },
+      },
+      {
+        eventId: 'current-11-task-completed',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'task.completed',
+        timestamp: '2026-05-11T13:00:10.000Z',
+        actor: 'orchestrator',
+        data: { summary: 'readonly sandbox blocked write command', budget: '2/5 steps' },
+      },
+    ];
+
+    render(<Dashboard events={events} run={run} sourceLabel="Current orchestrator fixture" />);
+
+    expect(screen.getAllByText(run.taskId).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(run.model.name)).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.getByText('Current orchestrator fixture')).toBeInTheDocument();
+
+    expect(screen.getAllByText('Tool Timeline').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('run').length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(screen.getAllByText('run')[0]);
+    expect(screen.getAllByText('Readonly sandbox blocked write command').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('mode=local · writeMode=readonly · blocked=true')).toBeInTheDocument();
+    expect(screen.queryByText('2750ms')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dashboard tests passed inside sandbox')).not.toBeInTheDocument();
+
+    expect(screen.getByText('Approval Queue')).toBeInTheDocument();
+    expect(screen.getByText('Policy decision: allow')).toBeInTheDocument();
+    expect(screen.getAllByText('allowed by test policy').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Sandbox blocked: local')).toBeInTheDocument();
+
+    expect(screen.getAllByText('Replay Debug').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Task created')).toBeInTheDocument();
+    expect(screen.getAllByText('Model requested').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Model completed').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Tool requested')).toBeInTheDocument();
+    expect(screen.getByText('Tool started')).toBeInTheDocument();
+    expect(screen.getByText('Tool finished')).toBeInTheDocument();
+    expect(screen.getByText('Sandbox blocked')).toBeInTheDocument();
+    expect(screen.getByText('Task completed')).toBeInTheDocument();
+
+    expect(screen.getByText('Multi-Agent Board')).toBeInTheDocument();
+    expect(screen.getAllByText('orchestrator').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('readonly sandbox blocked write command').length).toBeGreaterThanOrEqual(1);
+  });
 });
