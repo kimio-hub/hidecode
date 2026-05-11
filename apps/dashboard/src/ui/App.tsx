@@ -9,7 +9,12 @@ import {
   type TraceEvent,
 } from '../data/loader';
 import { describeDashboardSource, parseDashboardSource, type DashboardSource } from '../data/query';
+import AppShell from './AppShell';
 import Dashboard from './Dashboard';
+import BottomStatusBar from './components/BottomStatusBar';
+import LeftSidebar from './components/LeftSidebar';
+import RightInspector from './components/RightInspector';
+import WorkspacePlaceholder from './components/WorkspacePlaceholder';
 
 type LoadState =
   | { status: 'ready'; events: TraceEvent[]; run: RunMeta; source: DashboardSource; sourceLabel: string }
@@ -80,6 +85,17 @@ export default function App() {
       <CenteredState
         title="Failed to load run trace"
         detail={`${state.error}. Falling back to mock data is available by removing query parameters.`}
+      />
+    );
+  }
+
+  if (state.source.kind === 'mock') {
+    return (
+      <AppShell
+        sidebar={<LeftSidebar />}
+        workspace={<WorkspacePlaceholder />}
+        inspector={<RightInspector />}
+        status={<BottomStatusBar />}
       />
     );
   }

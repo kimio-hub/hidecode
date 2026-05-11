@@ -17,10 +17,11 @@ describe('App data loading', () => {
     setSearch('');
   });
 
-  it('renders mock data by default', () => {
+  it('renders the hidecode app shell by default', () => {
     render(<App />);
-    expect(screen.getByText('Mock')).toBeInTheDocument();
-    expect(screen.getAllByText('task-1778423383432').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('hidecode')).toBeInTheDocument();
+    expect(screen.getByText('Chat workspace coming next')).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Run inspector' })).toBeInTheDocument();
   });
 
   it('loads a run directory from the run query parameter', async () => {
