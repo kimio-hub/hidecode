@@ -98,7 +98,7 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
       );
     } catch (err: any) {
       await emit('task.failed', { reason: `Model error: ${err.message}`, budget: budget.formatSummary() });
-      return finish(false, `Model error at step ${stepIndex}: ${err.message}`, stepIndex, startTime, artifacts, runId, taskId, opts.task, budget, snapshots);
+      return finish(false, `Model error at step ${stepIndex}: ${err.message}`, stepIndex, startTime, artifacts, runId, taskId, opts.task, opts.model, budget, snapshots);
     }
 
     // Track token usage if model provides it
@@ -247,7 +247,7 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
     const reason = budget.getState().exceededReason;
     if (reason) finalSummary = `Task did not complete: ${reason}.`;
   }
-  return finish(completed, finalSummary, budget.getState().steps, startTime, artifacts, runId, taskId, opts.task, budget, snapshots);
+  return finish(completed, finalSummary, budget.getState().steps, startTime, artifacts, runId, taskId, opts.task, opts.model, budget, snapshots);
 }
 
 async function verifyAcceptanceCriteria(task: Task, summary: string): Promise<string> {
@@ -275,7 +275,7 @@ async function verifyAcceptanceCriteria(task: Task, summary: string): Promise<st
 
 async function finish(
   ok: boolean, summary: string, steps: number, startTime: number,
-  artifacts: ReturnType<typeof runArtifactLayout>, runId: string, taskId: string, task: Task,
+  artifacts: ReturnType<typeof runArtifactLayout>, runId: string, taskId: string, task: Task, model: ModelAdapter,
   budget: BudgetTracker, snapshots: string[],
 ): Promise<OrchestratorResult> {
   const durationMs = Date.now() - startTime;
@@ -308,7 +308,7 @@ async function finish(
   const manifest = {
     runId, taskId,
     harnessVersion: HARNESS_VERSION,
-    model: { provider: 'unknown', name: 'unknown' },
+    model: { provider: model.provider ?? 'unknown', name: model.name ?? 'unknown' },
     workspace: { repo: task.repo },
     artifacts,
     summary,

@@ -8,6 +8,7 @@ export type ModelStep =
 
 export interface ModelAdapter {
   name: string;
+  provider?: string;
   next(task: Task, observations: Observation[]): Promise<ModelStep>;
   /** Optional: stream tokens. Default falls back to next(). */
   stream?(task: Task, observations: Observation[]): AsyncIterable<string>;
@@ -24,6 +25,7 @@ export interface Observation {
 // ─── Scripted (deterministic, for testing) ─────────────────────
 export class ScriptedModelAdapter implements ModelAdapter {
   name = 'scripted-local';
+  provider = 'scripted';
   private index = 0;
   constructor(private readonly script: ModelStep[]) {}
   async next(): Promise<ModelStep> {
@@ -62,6 +64,7 @@ Always explain your reasoning before calling a tool. Be precise and safe.`;
 
 export class OpenAIModelAdapter implements ModelAdapter {
   readonly name: string;
+  readonly provider = 'openai-compatible';
   private config: Required<OpenAIAdapterConfig>;
 
   constructor(config: OpenAIAdapterConfig) {

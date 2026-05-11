@@ -29,6 +29,47 @@ describe('single-agent orchestrator', () => {
     expect(result.reportPath).toContain('report.md');
   });
 
+  it('records safe model metadata in the run manifest', async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'wh-repo-'));
+    const result = await runSingleAgentTask({
+      task: taskFor(repo),
+      model: new ScriptedModelAdapter([{ kind: 'final', summary: 'done' }]),
+      tools: [],
+      policy: { id: 'allow', allow: ['read', 'write', 'execute', 'git', 'network'], ask: [], deny: [] },
+    });
+
+    const manifestPath = path.join(path.dirname(result.tracePath), 'run.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    expect(manifest.model).toEqual({ provider: 'scripted', name: 'scripted-local' });
+  });
+
+  it('records safe model metadata when model execution fails', async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'wh-repo-'));
+    const model = {
+      provider: 'test-provider',
+      name: 'failing-model',
+      async next() {
+        throw new Error('synthetic model failure');
+      },
+    };
+
+    const result = await runSingleAgentTask({
+      task: taskFor(repo),
+      model,
+      tools: [],
+      policy: { id: 'allow', allow: ['read', 'write', 'execute', 'git', 'network'], ask: [], deny: [] },
+    });
+
+    const manifestPath = path.join(path.dirname(result.tracePath), 'run.json');
+    const manifestText = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(manifestText);
+    expect(result.ok).toBe(false);
+    expect(manifest.model).toEqual({ provider: 'test-provider', name: 'failing-model' });
+    expect(manifestText).not.toContain('apiKey');
+    expect(manifestText).not.toContain('baseUrl');
+    expect(manifestText).not.toContain('systemPrompt');
+  });
+
   it('records extended event types accepted by the trace schema', async () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'wh-repo-'));
     const result = await runSingleAgentTask({
