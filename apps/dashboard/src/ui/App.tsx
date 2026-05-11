@@ -89,18 +89,22 @@ export default function App() {
     );
   }
 
-  if (state.source.kind === 'mock') {
-    return (
+  if (state.source.kind !== 'mock') {
+    return <Dashboard events={state.events} run={state.run} sourceLabel={state.sourceLabel} />;
+  }
+
+  const shellEvents = state.status === 'ready' ? state.events : MOCK_EVENTS;
+
+  return (
+    <div style={{ background: '#070a12', minHeight: '100vh' }}>
       <AppShell
         sidebar={<LeftSidebar />}
         workspace={<HomePage />}
-        inspector={<RightInspector />}
+        inspector={<RightInspector events={shellEvents} />}
         status={<BottomStatusBar />}
       />
-    );
-  }
-
-  return <Dashboard events={state.events} run={state.run} sourceLabel={state.sourceLabel} />;
+    </div>
+  );
 }
 
 function CenteredState({ title, detail }: { title: string; detail: string }) {

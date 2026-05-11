@@ -16,7 +16,7 @@ describe('AppShell', () => {
     expect(screen.getByRole('banner', { name: 'hidecode top bar' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Project sidebar' })).toHaveTextContent('Project sidebar');
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveTextContent('Chat workspace');
-    expect(screen.getByRole('complementary', { name: 'Run inspector' })).toHaveTextContent('Run inspector');
+    expect(screen.getByLabelText('Run inspector panel')).toHaveTextContent('Run inspector');
     expect(screen.getByRole('contentinfo', { name: 'Workspace status' })).toHaveTextContent('Sandbox guarded');
   });
 

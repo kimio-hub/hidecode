@@ -19,9 +19,9 @@ export default function AppShell({ sidebar, workspace, inspector, status }: AppS
         <main aria-label="Workspace" style={styles.workspace}>
           {workspace}
         </main>
-        <aside aria-label="Run inspector" style={styles.inspector}>
+        <div aria-label="Run inspector panel" style={styles.inspector}>
           {inspector}
-        </aside>
+        </div>
       </div>
       <footer aria-label="Workspace status" style={styles.status}>
         {status}
