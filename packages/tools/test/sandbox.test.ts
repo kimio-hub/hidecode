@@ -28,6 +28,55 @@ describe('execution sandbox', () => {
     expect(result.error).toMatch(/timeout/i);
   });
 
+  it('blocks common write commands when writeMode is readonly', async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'wh-sandbox-'));
+    const sandbox = new LocalSandbox({ writeMode: 'readonly' });
+    const commands = platform() === 'win32'
+      ? ['echo blocked > out.txt', 'pnpm i', 'git reset --hard']
+      : [
+          'printf blocked > out.txt',
+          'printf blocked>out.txt',
+          'printf blocked 2>err.log',
+          'printf blocked > "quoted.txt"',
+          "printf blocked > 'single-quoted.txt'",
+          'printf blocked 2> "quoted-err.log"',
+          'printf blocked >> "append.txt"',
+          'printf blocked |tee out.txt',
+          'true;touch out.txt',
+          'true&&rm out.txt',
+          'true;git reset --hard',
+          'true&&pnpm i',
+          'python3 -c "open(\'out.txt\', \'w\').write(\'x\')"',
+          '(touch grouped.txt)',
+          '$(touch substituted.txt)',
+          't"ouch" quoted-command.txt',
+          'true;g"it" reset --hard',
+          'true&&p"npm" i',
+          'py"thon3" -c "open(\'out.txt\', \'w\').write(\'x\')"',
+          'echo `touch backtick.txt`',
+          'npm uninstall left-pad',
+        ];
+
+    for (const command of commands) {
+      const result = await sandbox.execute({ command, repo, cwd: repo });
+
+      expect(result.ok, command).toBe(false);
+      expect(result.error, command).toMatch(/readonly/i);
+      expect(result.sandbox.writeMode, command).toBe('readonly');
+    }
+  });
+
+  it('allows readonly commands with quoted or escaped comparison text', async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'wh-sandbox-'));
+    const sandbox = new LocalSandbox({ writeMode: 'readonly' });
+    const command = platform() === 'win32' ? 'echo readonly' : 'printf readonly && true';
+
+    const result = await sandbox.execute({ command, repo, cwd: repo });
+
+    expect(result.ok).toBe(true);
+    expect(result.sandbox.writeMode).toBe('readonly');
+  });
+
   it('lets repo-scoped run tools use injected sandbox', async () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'wh-sandbox-'));
     const calls: string[] = [];

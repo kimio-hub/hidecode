@@ -16,6 +16,74 @@ function timeoutMessage(err: any, timeoutMs: number): string | undefined {
   return undefined;
 }
 
+function normalizeShellSyntax(command: string): string {
+  let result = '';
+  let quote: 'single' | 'double' | undefined;
+  let escaped = false;
+  let previousNonSpace = '';
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index]!;
+    if (escaped) {
+      result += ' ';
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      result += ' ';
+      escaped = true;
+      continue;
+    }
+    if (quote === 'single') {
+      if (char === "'") {
+        quote = undefined;
+        continue;
+      }
+      result += previousNonSpace === '>' || /\w/.test(previousNonSpace) ? char : ' ';
+      continue;
+    }
+    if (quote === 'double') {
+      if (char === '"') {
+        quote = undefined;
+        continue;
+      }
+      result += previousNonSpace === '>' || /\w/.test(previousNonSpace) ? char : ' ';
+      continue;
+    }
+    if (char === "'") {
+      const nextChar = command[index + 1] ?? '';
+      quote = 'single';
+      if (/\w/.test(previousNonSpace) && /\w/.test(nextChar)) continue;
+      result += previousNonSpace === '>' ? 'q' : ' ';
+      continue;
+    }
+    if (char === '"') {
+      const nextChar = command[index + 1] ?? '';
+      quote = 'double';
+      if (/\w/.test(previousNonSpace) && /\w/.test(nextChar)) continue;
+      result += previousNonSpace === '>' ? 'q' : ' ';
+      continue;
+    }
+    result += char;
+    if (!/\s/.test(char)) previousNonSpace = char;
+  }
+
+  return result;
+}
+
+function commandViolatesReadonly(command: string): boolean {
+  const normalized = normalizeShellSyntax(command).toLowerCase();
+  const boundary = String.raw`(^|[\s|;&($` + '`' + String.raw`])`;
+  const redirection = /(^|[^\\\s])\d?>\s*[^\s>&|;]|\s\d?>\s*(?:[\w./-]|q[\w./-])/;
+  return [
+    redirection,
+    new RegExp(`${boundary}(tee|touch|mkdir|rm|rmdir|mv|cp|chmod|chown|ln|install|rsync)\\b`),
+    new RegExp(`${boundary}git\\s+(checkout|switch|reset|clean|apply|am|merge|rebase|commit|push|pull|add|restore|stash|tag|branch|worktree)\\b`),
+    new RegExp(`${boundary}(npm|pnpm|yarn)\\s+(install|i|add|remove|rm|uninstall|update|upgrade|ci|link|unlink)\\b`),
+    new RegExp(`${boundary}(python|python3|node|perl|ruby)\\s+(-c|-e|--eval)\\b`),
+  ].some(pattern => pattern.test(normalized));
+}
+
 export type SandboxMode = string;
 
 export type ExecutionRequest = {
@@ -75,6 +143,17 @@ export class LocalSandbox implements ExecutionSandbox {
     };
 
     try {
+      if (sandboxMeta.writeMode === 'readonly' && commandViolatesReadonly(request.command)) {
+        return {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          exitCode: 1,
+          error: 'Readonly sandbox blocked a command that appears to write to the workspace',
+          sandbox: sandboxMeta,
+        };
+      }
+
       const shell = shellFor(request.command);
       const { stdout, stderr } = await execFileAsync(shell.file, shell.args, {
         cwd: request.cwd,
