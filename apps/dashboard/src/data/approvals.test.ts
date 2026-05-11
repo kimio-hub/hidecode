@@ -66,4 +66,24 @@ describe('deriveApprovalQueue', () => {
     expect(items[0]).toMatchObject({ kind: 'tool-risk', risk: 'high', status: 'pending', title: 'High-risk tool: write_file' });
     expect(items[1]).toMatchObject({ kind: 'tool-risk', risk: 'critical', status: 'pending', title: 'High-risk tool: execute' });
   });
+
+  it('derives sandbox blocked events as denied high-risk queue items', () => {
+    const items = deriveApprovalQueue([
+      event({
+        eventId: 'sandbox-1',
+        type: 'sandbox.blocked',
+        data: { error: 'Readonly sandbox blocked write', sandbox: { mode: 'local', writeMode: 'readonly' } },
+      }),
+    ]);
+
+    expect(items[0]).toMatchObject({
+      id: 'sandbox-1',
+      kind: 'sandbox',
+      risk: 'high',
+      status: 'denied',
+      title: 'Sandbox blocked: local',
+    });
+    expect(items[0].summary).toContain('Readonly sandbox blocked write');
+    expect(items[0].summary).toContain('writeMode=readonly');
+  });
 });

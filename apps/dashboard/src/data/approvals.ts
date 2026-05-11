@@ -1,6 +1,6 @@
 import type { TraceEvent } from './loader';
 
-export type ApprovalQueueKind = 'approval' | 'policy' | 'security' | 'tool-risk';
+export type ApprovalQueueKind = 'approval' | 'policy' | 'security' | 'tool-risk' | 'sandbox';
 export type ApprovalRisk = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
 export type ApprovalStatus = 'pending' | 'allowed' | 'denied' | 'informational';
 
@@ -30,6 +30,10 @@ export function deriveApprovalQueue(events: TraceEvent[]): ApprovalQueueItem[] {
 
     if (event.type === 'security.finding') {
       return [securityItem(event)];
+    }
+
+    if (event.type === 'sandbox.blocked') {
+      return [sandboxItem(event)];
     }
 
     const risk = normalizeRisk(event.data.risk);
@@ -72,6 +76,21 @@ function securityItem(event: TraceEvent): ApprovalQueueItem {
     status: 'informational',
     timestamp: event.timestamp,
     summary: messages.length > 0 ? messages.join('; ') : stringifySummary(event.data.message ?? 'Security finding recorded'),
+  };
+}
+
+function sandboxItem(event: TraceEvent): ApprovalQueueItem {
+  const sandbox = typeof event.data.sandbox === 'object' && event.data.sandbox !== null ? event.data.sandbox as Record<string, unknown> : {};
+  const mode = typeof sandbox.mode === 'string' ? sandbox.mode : 'sandbox';
+  const writeMode = typeof sandbox.writeMode === 'string' ? sandbox.writeMode : undefined;
+  return {
+    id: event.eventId,
+    title: `Sandbox blocked: ${mode}`,
+    kind: 'sandbox',
+    risk: 'high',
+    status: 'denied',
+    timestamp: event.timestamp,
+    summary: [stringifySummary(event.data.error ?? 'Sandbox blocked command'), writeMode ? `writeMode=${writeMode}` : undefined].filter(Boolean).join(' · '),
   };
 }
 

@@ -31,24 +31,27 @@ describe('deriveReplaySteps', () => {
       event({ eventId: 'c', type: 'tool.result', timestamp: '2026-05-10T10:00:02.000Z', actor: 'runtime', data: { ok: false, summary: 'Tests failed' } }),
       event({ eventId: 'd', type: 'policy.decision', timestamp: '2026-05-10T10:00:03.000Z', actor: 'policy', data: { decision: 'allow', reason: 'within repo' } }),
       event({ eventId: 'e', type: 'security.finding', timestamp: '2026-05-10T10:00:04.000Z', actor: 'security', data: { severity: 'high', message: 'Secret-like token' } }),
-      event({ eventId: 'f', type: 'diff.applied', timestamp: '2026-05-10T10:00:05.000Z', actor: 'agent', data: { files: ['src/a.ts'] } }),
-      event({ eventId: 'g', type: 'budget.updated', timestamp: '2026-05-10T10:00:06.000Z', actor: 'runtime', data: { tokens: 123 } }),
+      event({ eventId: 'f', type: 'sandbox.blocked', timestamp: '2026-05-10T10:00:05.000Z', actor: 'runtime', data: { error: 'Readonly sandbox blocked write', sandbox: { mode: 'local', writeMode: 'readonly' } } }),
+      event({ eventId: 'g', type: 'diff.applied', timestamp: '2026-05-10T10:00:06.000Z', actor: 'agent', data: { files: ['src/a.ts'] } }),
+      event({ eventId: 'h', type: 'budget.updated', timestamp: '2026-05-10T10:00:07.000Z', actor: 'runtime', data: { tokens: 123 } }),
     ]);
 
-    expect(steps.map(step => step.category)).toEqual(['task', 'model', 'tool', 'policy', 'security', 'diff', 'other']);
+    expect(steps.map(step => step.category)).toEqual(['task', 'model', 'tool', 'policy', 'security', 'sandbox', 'diff', 'other']);
     expect(steps.map(step => step.title)).toEqual([
       'Task created',
       'Model responded',
       'Tool result',
       'Policy decision',
       'Security finding',
+      'Sandbox blocked',
       'Diff applied',
       'Budget updated',
     ]);
     expect(steps[2]?.summary).toContain('Tests failed');
     expect(steps[3]?.summary).toContain('allow');
     expect(steps[4]?.summary).toContain('Secret-like token');
-    expect(steps[5]?.summary).toContain('src/a.ts');
+    expect(steps[5]?.summary).toContain('Readonly sandbox blocked write');
+    expect(steps[6]?.summary).toContain('src/a.ts');
   });
 
   it('uses stable fallback ids and handles invalid timestamps', () => {

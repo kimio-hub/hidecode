@@ -10,6 +10,7 @@ const categoryTone: Record<ReplayStep['category'], string> = {
   tool: '#34d399',
   policy: '#facc15',
   security: '#fb7185',
+  sandbox: '#f97316',
   diff: '#38bdf8',
   other: '#94a3b8',
 };

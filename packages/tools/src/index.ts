@@ -273,6 +273,7 @@ export function createRepoTools(repo: string, options: RepoToolsOptions = {}): T
             output: { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode },
             error: result.error,
             evidence: [],
+            sandbox: { ...result.sandbox, blocked: !result.ok && /readonly sandbox blocked/i.test(result.error ?? '') },
           };
         } catch (error) {
           return evidenceFailure(error, { stdout: '', stderr: '', exitCode: 1 });
@@ -292,6 +293,7 @@ export function createRepoTools(repo: string, options: RepoToolsOptions = {}): T
             output: { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode },
             error: result.error,
             evidence: [],
+            sandbox: { ...result.sandbox, blocked: !result.ok && /readonly sandbox blocked/i.test(result.error ?? '') },
           };
         } catch (error) {
           return evidenceFailure(error, { stdout: '', stderr: '', exitCode: 1 });

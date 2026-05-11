@@ -214,7 +214,10 @@ export async function runSingleAgentTask(opts: OrchestratorOptions): Promise<Orc
       result = { ok: false,        error: err instanceof Error ? err.message : String(err)};
     }
 
-    await emit('tool.finished', { tool: toolReq.tool, ok: result.ok, error: result.error, evidence: result.evidence });
+    await emit('tool.finished', { tool: toolReq.tool, ok: result.ok, error: result.error, evidence: result.evidence, sandbox: result.sandbox });
+    if (result.sandbox && typeof result.sandbox === 'object' && (result.sandbox as Record<string, unknown>).blocked === true) {
+      await emit('sandbox.blocked', { tool: toolReq.tool, error: result.error, sandbox: result.sandbox });
+    }
 
     // Scan output for secrets
     if (opts.securityScan !== false && result.output) {

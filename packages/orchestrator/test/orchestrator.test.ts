@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ScriptedModelAdapter } from '@world-harness/models';
-import { readTool, runTool } from '@world-harness/tools';
+import { readTool, runTool, createRepoTools, LocalSandbox } from '@world-harness/tools';
 import { runSingleAgentTask } from '../src/index.js';
 
 const taskFor = (repo: string) => ({
@@ -87,6 +87,36 @@ describe('single-agent orchestrator', () => {
     expect(trace).toContain('plan.created');
     expect(trace).toContain('security.finding');
     expect(result.ok).toBe(true);
+  });
+
+  it('records sandbox metadata and blocked decisions in trace events', async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'wh-repo-'));
+    const tools = createRepoTools(repo, { sandbox: new LocalSandbox({ writeMode: 'readonly' }) });
+
+    const result = await runSingleAgentTask({
+      task: taskFor(repo),
+      model: new ScriptedModelAdapter([
+        { kind: 'tool', request: { tool: 'run', input: { command: 'printf blocked > out.txt', cwd: repo }, risks: ['execute'] } },
+        { kind: 'final', summary: 'readonly sandbox blocked write command' },
+      ]),
+      tools,
+      policy: { id: 'allow', allow: ['read', 'write', 'execute', 'git', 'network'], ask: [], deny: [] },
+    });
+
+    const traceText = await readFile(result.tracePath, 'utf8');
+    const events = traceText.trim().split('\n').map(line => JSON.parse(line));
+    const sandboxEvent = events.find(event => event.type === 'sandbox.blocked');
+    const toolFinished = events.find(event => event.type === 'tool.finished' && event.data.sandbox?.blocked === true);
+
+    expect(sandboxEvent).toBeDefined();
+    expect(sandboxEvent.data).toMatchObject({
+      tool: 'run',
+      sandbox: { mode: 'local', writeMode: 'readonly', blocked: true },
+    });
+    expect(toolFinished).toBeDefined();
+    expect(traceText).not.toContain('ALLOWED_VALUE');
+    expect(traceText).not.toContain('apiKey');
+    expect(traceText).not.toContain('password');
   });
 
   it('does not auto-approve ask policy decisions', async () => {

@@ -1,6 +1,6 @@
 import type { TraceEvent } from './loader';
 
-export type ReplayStepCategory = 'task' | 'model' | 'tool' | 'policy' | 'security' | 'diff' | 'other';
+export type ReplayStepCategory = 'task' | 'model' | 'tool' | 'policy' | 'security' | 'sandbox' | 'diff' | 'other';
 
 export interface ReplayStep {
   id: string;
@@ -54,6 +54,7 @@ function categoryFor(type: string): ReplayStepCategory {
   if (type.startsWith('tool.')) return 'tool';
   if (type.startsWith('policy.')) return 'policy';
   if (type.startsWith('security.')) return 'security';
+  if (type.startsWith('sandbox.')) return 'sandbox';
   if (type.startsWith('diff.')) return 'diff';
   return 'other';
 }
@@ -73,6 +74,7 @@ function summaryFor(event: TraceEvent): string {
   if (event.type.startsWith('tool.')) return toolSummary(event);
   if (event.type.startsWith('policy.')) return policySummary(data);
   if (event.type.startsWith('security.')) return securitySummary(data);
+  if (event.type.startsWith('sandbox.')) return sandboxSummary(data);
   if (event.type.startsWith('diff.')) return diffSummary(data);
 
   const compact = JSON.stringify(data);
@@ -100,6 +102,14 @@ function securitySummary(data: Record<string, unknown>): string {
   const message = typeof data.message === 'string' ? data.message : undefined;
   const rule = typeof data.ruleId === 'string' ? data.ruleId : undefined;
   return [severity, message, rule].filter(Boolean).join(' · ') || 'Security finding';
+}
+
+function sandboxSummary(data: Record<string, unknown>): string {
+  const sandbox = typeof data.sandbox === 'object' && data.sandbox !== null ? data.sandbox as Record<string, unknown> : {};
+  const writeMode = typeof sandbox.writeMode === 'string' ? `writeMode=${sandbox.writeMode}` : undefined;
+  const mode = typeof sandbox.mode === 'string' ? `mode=${sandbox.mode}` : undefined;
+  const error = typeof data.error === 'string' ? data.error : undefined;
+  return [error, mode, writeMode].filter(Boolean).join(' · ') || 'Sandbox blocked command';
 }
 
 function diffSummary(data: Record<string, unknown>): string {
