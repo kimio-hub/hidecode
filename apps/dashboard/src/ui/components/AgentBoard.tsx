@@ -1,10 +1,16 @@
 import type { AgentBoardItem } from '../../data/agents';
+import { actionReasonAttributes, buildAgentActionIntent } from '../../data/actions';
 
 interface Props {
   items: AgentBoardItem[];
 }
 
 export default function AgentBoard({ items }: Props) {
+  const firstAgentId = items[0]?.id ?? 'agent';
+  const assignIntent = buildAgentActionIntent('assign', firstAgentId);
+  const handoffIntent = buildAgentActionIntent('handoff', firstAgentId);
+  const unblockIntent = buildAgentActionIntent('unblock', firstAgentId);
+
   if (items.length === 0) {
     return <div style={{ color: '#71717a', fontSize: '12px' }}>No agent activity</div>;
   }
@@ -12,9 +18,9 @@ export default function AgentBoard({ items }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-        <FutureAction label="Assign" />
-        <FutureAction label="Handoff" />
-        <FutureAction label="Unblock" />
+        <FutureAction label={assignIntent.label} reasonAttributes={actionReasonAttributes(assignIntent)} />
+        <FutureAction label={handoffIntent.label} reasonAttributes={actionReasonAttributes(handoffIntent)} />
+        <FutureAction label={unblockIntent.label} reasonAttributes={actionReasonAttributes(unblockIntent)} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
         {items.map(item => (
@@ -50,9 +56,9 @@ export default function AgentBoard({ items }: Props) {
   );
 }
 
-function FutureAction({ label }: { label: string }) {
+function FutureAction({ label, reasonAttributes }: { label: string; reasonAttributes: ReturnType<typeof actionReasonAttributes> }) {
   return (
-    <button disabled style={{ border: '1px solid #2d2d44', borderRadius: '999px', padding: '5px 10px', color: '#71717a', background: '#11111a', fontSize: '11px', cursor: 'not-allowed' }}>
+    <button disabled {...reasonAttributes} style={{ border: '1px solid #2d2d44', borderRadius: '999px', padding: '5px 10px', color: '#71717a', background: '#11111a', fontSize: '11px', cursor: 'not-allowed' }}>
       {label}
     </button>
   );

@@ -1,4 +1,5 @@
 import type { TraceEvent, RunMeta } from '../data/mock';
+import { actionReasonAttributes, buildCommandActionIntent } from '../data/actions';
 import { deriveApprovalQueue } from '../data/approvals';
 import { deriveReplaySteps } from '../data/replay';
 import { deriveAgentBoard } from '../data/agents';
@@ -30,6 +31,7 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
   const approvalQueue = deriveApprovalQueue(events);
   const replaySteps = deriveReplaySteps(events);
   const agentBoard = deriveAgentBoard(events);
+  const askHarnessIntent = buildCommandActionIntent('ask-harness');
   const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
   const duration = formatDuration(events);
 
@@ -127,7 +129,7 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
             <PanelTitle title="Command Dock" />
             <div style={{ display: 'flex', gap: '8px' }}>
               <DockPill label="Terminal" />
-              <DockPill label="Ask Harness" />
+              <DockAction label={askHarnessIntent.label} reasonAttributes={actionReasonAttributes(askHarnessIntent)} />
             </div>
           </div>
           <div style={{
@@ -186,6 +188,14 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
 function DockPill({ label }: { label: string }) {
   return (
     <span style={{ border: '1px solid #2d2d44', borderRadius: '999px', padding: '4px 9px', color: '#a1a1aa', fontSize: '11px' }}>{label}</span>
+  );
+}
+
+function DockAction({ label, reasonAttributes }: { label: string; reasonAttributes: ReturnType<typeof actionReasonAttributes> }) {
+  return (
+    <button disabled {...reasonAttributes} style={{ border: '1px solid #2d2d44', borderRadius: '999px', padding: '4px 9px', color: '#71717a', background: '#11111a', fontSize: '11px', cursor: 'not-allowed' }}>
+      {label}
+    </button>
   );
 }
 

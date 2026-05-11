@@ -34,14 +34,23 @@ describe('Dashboard', () => {
     expect(screen.getByText('Command Dock')).toBeInTheDocument();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
     expect(screen.getByText('Ask Harness')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ask Harness' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ask Harness' })).toHaveAttribute('title', expect.stringMatching(/command submission is disabled until the dashboard runtime backend api is available/i));
   });
 
   it('renders read-only approval queue items', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
     expect(screen.getByText('Approval Queue')).toBeInTheDocument();
     expect(screen.getByText('Policy decision: allow')).toBeInTheDocument();
-    expect(screen.getByText('Approve')).toBeInTheDocument();
-    expect(screen.getByText('Reject')).toBeInTheDocument();
+    const approvalReason = /disabled until the dashboard runtime backend api is available/i;
+    const approveButton = screen.getByRole('button', { name: 'Approve' });
+    const rejectButton = screen.getByRole('button', { name: 'Reject' });
+    expect(approveButton).toBeDisabled();
+    expect(rejectButton).toBeDisabled();
+    expect(approveButton).toHaveAttribute('title', expect.stringMatching(approvalReason));
+    expect(rejectButton).toHaveAttribute('title', expect.stringMatching(approvalReason));
+    expect(approveButton).toHaveAttribute('aria-description', expect.stringMatching(approvalReason));
+    expect(rejectButton).toHaveAttribute('aria-description', expect.stringMatching(approvalReason));
   });
 
   it('renders read-only replay debugger items and future actions', () => {
@@ -53,6 +62,10 @@ describe('Dashboard', () => {
     expect(screen.getByRole('button', { name: 'Replay' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Fork' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save Eval' })).toBeDisabled();
+    const replayReason = /disabled until the dashboard runtime backend api is available/i;
+    expect(screen.getByRole('button', { name: 'Replay' })).toHaveAttribute('title', expect.stringMatching(replayReason));
+    expect(screen.getByRole('button', { name: 'Fork' })).toHaveAttribute('title', expect.stringMatching(replayReason));
+    expect(screen.getByRole('button', { name: 'Save Eval' })).toHaveAttribute('title', expect.stringMatching(replayReason));
   });
 
   it('renders read-only multi-agent board items and future actions', () => {
@@ -66,6 +79,10 @@ describe('Dashboard', () => {
     expect(screen.getByRole('button', { name: 'Assign' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Handoff' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Unblock' })).toBeDisabled();
+    const agentReason = /disabled until the dashboard runtime backend api is available/i;
+    expect(screen.getByRole('button', { name: 'Assign' })).toHaveAttribute('title', expect.stringMatching(agentReason));
+    expect(screen.getByRole('button', { name: 'Handoff' })).toHaveAttribute('title', expect.stringMatching(agentReason));
+    expect(screen.getByRole('button', { name: 'Unblock' })).toHaveAttribute('title', expect.stringMatching(agentReason));
   });
 
   it('shows model name in header', () => {

@@ -1,4 +1,5 @@
 import type { ApprovalQueueItem } from '../../data/approvals';
+import { actionReasonAttributes, buildApprovalActionIntent } from '../../data/actions';
 
 interface Props {
   items: ApprovalQueueItem[];
@@ -37,6 +38,9 @@ export default function ApprovalQueue({ items }: Props) {
 }
 
 function ApprovalQueueCard({ item }: { item: ApprovalQueueItem }) {
+  const approveIntent = buildApprovalActionIntent('approve', item.id);
+  const rejectIntent = buildApprovalActionIntent('reject', item.id);
+
   return (
     <article style={{
       border: '1px solid #23233a',
@@ -60,8 +64,8 @@ function ApprovalQueueCard({ item }: { item: ApprovalQueueItem }) {
           <span style={{ color: '#555', fontSize: '10px' }}>{new Date(item.timestamp).toLocaleTimeString()}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <DisabledAction label="Approve" />
-          <DisabledAction label="Reject" />
+          <DisabledAction label={approveIntent.label} reasonAttributes={actionReasonAttributes(approveIntent)} />
+          <DisabledAction label={rejectIntent.label} reasonAttributes={actionReasonAttributes(rejectIntent)} />
         </div>
       </div>
     </article>
@@ -86,9 +90,9 @@ function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
-function DisabledAction({ label }: { label: string }) {
+function DisabledAction({ label, reasonAttributes }: { label: string; reasonAttributes: ReturnType<typeof actionReasonAttributes> }) {
   return (
-    <button disabled style={{
+    <button disabled {...reasonAttributes} style={{
       border: '1px solid #2d2d44',
       borderRadius: '8px',
       background: '#11111a',

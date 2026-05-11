@@ -1,4 +1,5 @@
 import type { ReplayStep } from '../../data/replay';
+import { actionReasonAttributes, buildReplayActionIntent } from '../../data/actions';
 
 interface Props {
   steps: ReplayStep[];
@@ -16,6 +17,10 @@ const categoryTone: Record<ReplayStep['category'], string> = {
 };
 
 export default function ReplayDebugger({ steps }: Props) {
+  const replayIntent = buildReplayActionIntent('replay', steps[0]?.id);
+  const forkIntent = buildReplayActionIntent('fork', steps[0]?.id);
+  const saveEvalIntent = buildReplayActionIntent('save-eval');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
@@ -24,9 +29,9 @@ export default function ReplayDebugger({ steps }: Props) {
           <div style={{ color: '#71717a', fontSize: '11px', marginTop: '3px' }}>{steps.length} chronological trace steps</div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <ActionButton label="Replay" />
-          <ActionButton label="Fork" />
-          <ActionButton label="Save Eval" />
+          <ActionButton label={replayIntent.label} reasonAttributes={actionReasonAttributes(replayIntent)} />
+          <ActionButton label={forkIntent.label} reasonAttributes={actionReasonAttributes(forkIntent)} />
+          <ActionButton label={saveEvalIntent.label} reasonAttributes={actionReasonAttributes(saveEvalIntent)} />
         </div>
       </div>
 
@@ -69,10 +74,11 @@ export default function ReplayDebugger({ steps }: Props) {
   );
 }
 
-function ActionButton({ label }: { label: string }) {
+function ActionButton({ label, reasonAttributes }: { label: string; reasonAttributes: ReturnType<typeof actionReasonAttributes> }) {
   return (
     <button
       disabled
+      {...reasonAttributes}
       style={{
         border: '1px solid #2d2d44',
         borderRadius: '999px',
