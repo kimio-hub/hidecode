@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import Dashboard from '../Dashboard';
 import { MOCK_EVENTS, MOCK_RUN } from '../../data/mock';
+import type { RunMeta, TraceEvent } from '../../data/mock';
 
 describe('Dashboard', () => {
   it('renders the header with task id', () => {
@@ -75,5 +76,127 @@ describe('Dashboard', () => {
   it('shows completed status when task.completed event exists', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
     expect(screen.getByText('Completed')).toBeInTheDocument();
+  });
+
+  it('renders orchestrator-style task, tool, approval, sandbox, and completion events across dashboard panels', () => {
+    const run: RunMeta = {
+      runId: 'run-orchestrator-integration',
+      taskId: 'task-orchestrator-integration',
+      harnessVersion: '0.1.0-test',
+      model: { provider: 'nous', name: 'Hermes Orchestrator' },
+      summary: 'Exercise dashboard with orchestrator trace event names',
+    };
+
+    const events: TraceEvent[] = [
+      {
+        eventId: 'orch-1-task-created',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'task.created',
+        timestamp: '2026-05-11T12:00:00.000Z',
+        actor: 'orchestrator',
+        data: { agentId: 'planner', goal: 'Run dashboard integration coverage from orchestrator trace' },
+      },
+      {
+        eventId: 'orch-2-tool-requested',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'tool.requested',
+        timestamp: '2026-05-11T12:00:01.000Z',
+        actor: 'orchestrator',
+        data: {
+          agentId: 'executor',
+          tool: 'execute_shell',
+          command: 'pnpm --filter @world-harness/dashboard test',
+          risks: ['write', 'network'],
+        },
+      },
+      {
+        eventId: 'orch-3-approval-requested',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'approval.requested',
+        timestamp: '2026-05-11T12:00:02.000Z',
+        actor: 'policy',
+        data: {
+          agentId: 'executor',
+          tool: 'execute_shell',
+          reason: 'Shell command requires elevated orchestrator approval',
+          risk: 'high',
+        },
+      },
+      {
+        eventId: 'orch-4-tool-finished',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'tool.finished',
+        timestamp: '2026-05-11T12:00:04.000Z',
+        actor: 'runtime',
+        data: {
+          agentId: 'executor',
+          tool: 'execute_shell',
+          durationMs: 2750,
+          output: {
+            ok: true,
+            summary: 'Dashboard tests passed inside sandbox',
+            stdout: 'PASS apps/dashboard/src/ui/__tests__/Dashboard.test.tsx',
+          },
+          sandbox: {
+            mode: 'ephemeral',
+            writeMode: 'workspace',
+            blocked: false,
+          },
+        },
+      },
+      {
+        eventId: 'orch-5-sandbox-blocked',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'sandbox.blocked',
+        timestamp: '2026-05-11T12:00:05.000Z',
+        actor: 'runtime',
+        data: {
+          agentId: 'executor',
+          error: 'Readonly sandbox blocked write outside workspace',
+          sandbox: { mode: 'ephemeral', writeMode: 'readonly' },
+        },
+      },
+      {
+        eventId: 'orch-6-task-completed',
+        runId: run.runId,
+        taskId: run.taskId,
+        type: 'task.completed',
+        timestamp: '2026-05-11T12:00:06.000Z',
+        actor: 'orchestrator',
+        data: { agentId: 'executor', summary: 'Orchestrator dashboard integration trace completed' },
+      },
+    ];
+
+    render(<Dashboard events={events} run={run} sourceLabel="Orchestrator fixture" />);
+
+    expect(screen.getAllByText('Tool Timeline').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('execute_shell').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('2750ms')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('execute_shell')[0]);
+    expect(screen.getByText('PASS apps/dashboard/src/ui/__tests__/Dashboard.test.tsx')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard tests passed inside sandbox')).toBeInTheDocument();
+    expect(screen.getByText('mode=ephemeral · writeMode=workspace · blocked=false')).toBeInTheDocument();
+
+    expect(screen.getByText('Approval Queue')).toBeInTheDocument();
+    expect(screen.getByText('Approval requested: execute_shell')).toBeInTheDocument();
+    expect(screen.getByText('Shell command requires elevated orchestrator approval')).toBeInTheDocument();
+    expect(screen.getByText('Sandbox blocked: ephemeral')).toBeInTheDocument();
+    expect(screen.getAllByText(/Readonly sandbox blocked write outside workspace/).length).toBeGreaterThanOrEqual(1);
+
+    expect(screen.getAllByText('Replay Debug').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Tool requested')).toBeInTheDocument();
+    expect(screen.getByText('execute_shell · risk=high')).toBeInTheDocument();
+    expect(screen.getByText('Tool finished')).toBeInTheDocument();
+    expect(screen.getByText('Sandbox blocked')).toBeInTheDocument();
+    expect(screen.getByText('Task completed')).toBeInTheDocument();
+
+    expect(screen.getByText('Multi-Agent Board')).toBeInTheDocument();
+    expect(screen.getByText('executor')).toBeInTheDocument();
+    expect(screen.getAllByText('Orchestrator dashboard integration trace completed').length).toBeGreaterThanOrEqual(1);
   });
 });

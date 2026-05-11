@@ -55,16 +55,34 @@ describe('deriveApprovalQueue', () => {
     expect(items[0].summary).toContain('private key');
   });
 
-  it('includes high and critical risk tool events but excludes low risk tools', () => {
+  it('includes high and critical risk tool events from explicit risk and capability risks', () => {
     const items = deriveApprovalQueue([
       event({ eventId: 'low-tool', type: 'tool.call', data: { name: 'read_file', risk: 'low' } }),
       event({ eventId: 'high-tool', type: 'tool.call', data: { name: 'write_file', risk: 'high', input: { path: 'src/a.ts' } } }),
       event({ eventId: 'critical-tool', type: 'tool.started', data: { name: 'execute', risk: 'critical' } }),
+      event({ eventId: 'real-tool', type: 'tool.requested', data: { tool: 'terminal', risks: ['filesystem-write'], command: 'touch demo' } }),
     ]);
 
-    expect(items.map(item => item.id)).toEqual(['high-tool', 'critical-tool']);
+    expect(items.map(item => item.id)).toEqual(['high-tool', 'critical-tool', 'real-tool']);
     expect(items[0]).toMatchObject({ kind: 'tool-risk', risk: 'high', status: 'pending', title: 'High-risk tool: write_file' });
     expect(items[1]).toMatchObject({ kind: 'tool-risk', risk: 'critical', status: 'pending', title: 'High-risk tool: execute' });
+    expect(items[2]).toMatchObject({ kind: 'tool-risk', risk: 'high', status: 'pending', title: 'High-risk tool: terminal', summary: 'touch demo' });
+  });
+
+  it('ignores malformed security finding entries instead of throwing', () => {
+    const items = deriveApprovalQueue([
+      event({
+        eventId: 'malformed-security',
+        type: 'security.finding',
+        data: {
+          severity: 'medium',
+          findings: [null, 'not-a-finding', { severity: 'high', message: 'real finding' }],
+        },
+      }),
+    ]);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ risk: 'high', summary: 'real finding' });
   });
 
   it('derives sandbox blocked events as denied high-risk queue items', () => {
@@ -95,7 +113,7 @@ describe('deriveApprovalQueue', () => {
         data: {
           tool: 'execute_shell',
           reason: 'Command requires write access',
-          risk: 'high',
+          risks: ['filesystem-write'],
         },
       }),
     ]);

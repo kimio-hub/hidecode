@@ -1,4 +1,5 @@
 import type { TraceEvent } from './loader';
+import { nestedRecord, riskForData, sandboxForData, stringField, stringifySummary as normalizeSummary, toolNameForEvent } from './trace-normalize';
 
 export type ApprovalQueueKind = 'approval' | 'policy' | 'security' | 'tool-risk' | 'sandbox';
 export type ApprovalRisk = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
@@ -40,7 +41,7 @@ export function deriveApprovalQueue(events: TraceEvent[]): ApprovalQueueItem[] {
       return [sandboxItem(event)];
     }
 
-    const risk = normalizeRisk(event.data.risk);
+    const risk = normalizeRisk(riskForData(event.data));
     if (event.type.startsWith('tool.') && (risk === 'high' || risk === 'critical')) {
       return [toolRiskItem(event, risk)];
     }
@@ -50,14 +51,14 @@ export function deriveApprovalQueue(events: TraceEvent[]): ApprovalQueueItem[] {
 }
 
 function approvalItem(event: TraceEvent): ApprovalQueueItem {
-  const toolName = stringifySummary(event.data.tool ?? event.data.name ?? 'unknown');
+  const toolName = toolNameForEvent(event, 'unknown') ?? 'unknown';
   const decision = String(event.data.decision ?? event.data.status ?? '').toLowerCase();
   const isResolved = event.type === 'approval.resolved';
   return {
     id: event.eventId,
     title: isResolved ? `Approval resolved: ${toolName}` : `Approval requested: ${toolName}`,
     kind: 'approval',
-    risk: normalizeRisk(event.data.risk),
+    risk: normalizeRisk(riskForData(event.data)),
     status: approvalStatus(decision, isResolved),
     timestamp: event.timestamp,
     summary: stringifySummary(event.data.reason ?? event.data.summary ?? event.data.message ?? 'Approval event recorded'),
@@ -76,7 +77,7 @@ function approvalStatus(decision: string, isResolved: boolean): ApprovalStatus {
 
 function policyItem(event: TraceEvent): ApprovalQueueItem {
   const decision = String(event.data.decision ?? 'unknown').toLowerCase();
-  const risk = normalizeRisk(event.data.risk);
+  const risk = normalizeRisk(riskForData(event.data));
   return {
     id: event.eventId,
     title: `Policy decision: ${decision}`,
@@ -89,11 +90,13 @@ function policyItem(event: TraceEvent): ApprovalQueueItem {
 }
 
 function securityItem(event: TraceEvent): ApprovalQueueItem {
-  const findings = Array.isArray(event.data.findings) ? event.data.findings : [];
-  const risks = findings.map(finding => normalizeRisk((finding as Record<string, unknown>).severity));
+  const findings = Array.isArray(event.data.findings)
+    ? event.data.findings.map(nestedRecord).filter((finding): finding is Record<string, unknown> => finding !== undefined)
+    : [];
+  const risks = findings.map(finding => normalizeRisk(finding.severity));
   const risk = highestRisk(risks.length > 0 ? risks : [normalizeRisk(event.data.severity)]);
   const messages = findings
-    .map(finding => (finding as Record<string, unknown>).message)
+    .map(finding => finding.message)
     .filter(Boolean)
     .map(String);
 
@@ -109,9 +112,9 @@ function securityItem(event: TraceEvent): ApprovalQueueItem {
 }
 
 function sandboxItem(event: TraceEvent): ApprovalQueueItem {
-  const sandbox = typeof event.data.sandbox === 'object' && event.data.sandbox !== null ? event.data.sandbox as Record<string, unknown> : {};
-  const mode = typeof sandbox.mode === 'string' ? sandbox.mode : 'sandbox';
-  const writeMode = typeof sandbox.writeMode === 'string' ? sandbox.writeMode : undefined;
+  const sandbox = sandboxForData(event.data) ?? {};
+  const mode = stringField(sandbox.mode) ?? 'sandbox';
+  const writeMode = stringField(sandbox.writeMode);
   return {
     id: event.eventId,
     title: `Sandbox blocked: ${mode}`,
@@ -124,7 +127,7 @@ function sandboxItem(event: TraceEvent): ApprovalQueueItem {
 }
 
 function toolRiskItem(event: TraceEvent, risk: ApprovalRisk): ApprovalQueueItem {
-  const toolName = String(event.data.name ?? event.data.tool ?? 'unknown');
+  const toolName = toolNameForEvent(event, 'unknown') ?? 'unknown';
   return {
     id: event.eventId,
     title: `High-risk tool: ${toolName}`,
@@ -132,7 +135,7 @@ function toolRiskItem(event: TraceEvent, risk: ApprovalRisk): ApprovalQueueItem 
     risk,
     status: 'pending',
     timestamp: event.timestamp,
-    summary: stringifySummary(event.data.summary ?? event.data.input ?? `${toolName} requested ${risk} risk execution`),
+    summary: stringifySummary(event.data.summary ?? event.data.input ?? event.data.command ?? `${toolName} requested ${risk} risk execution`),
   };
 }
 
@@ -147,10 +150,5 @@ function highestRisk(risks: ApprovalRisk[]): ApprovalRisk {
 }
 
 function stringifySummary(value: unknown): string {
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
+  return normalizeSummary(value);
 }

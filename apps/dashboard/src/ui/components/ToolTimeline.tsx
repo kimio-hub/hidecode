@@ -1,4 +1,5 @@
-import type { TraceEvent } from '../../data/mock';
+import type { TraceEvent } from '../../data/loader';
+import { numberField, outputForData, riskForData, sandboxSummaryForData, stringField, toolNameForEvent } from '../../data/trace-normalize';
 import { Terminal, FileText, Wrench, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
@@ -48,8 +49,8 @@ function buildToolPairs(events: TraceEvent[]): ToolPair[] {
     const matchingResult = results.find(result => {
       if (usedResults.has(result.eventId)) return false;
 
-      const callToolName = explicitToolNameFor(call);
-      const resultToolName = explicitToolNameFor(result);
+      const callToolName = toolNameForEvent(call);
+      const resultToolName = toolNameForEvent(result);
       if (callToolName && resultToolName && callToolName !== resultToolName) return false;
 
       const callTime = parseTimestampMs(call.timestamp);
@@ -159,53 +160,19 @@ function ToolEntry({ call, result, index }: { call: TraceEvent; result?: TraceEv
 function normalizeToolDetails(call: TraceEvent, result?: TraceEvent): NormalizedToolDetails {
   const callData = call.data as Record<string, unknown>;
   const resultData = result?.data as Record<string, unknown> | undefined;
-  const output = typeof resultData?.output === 'object' && resultData.output !== null ? resultData.output as Record<string, unknown> : {};
-  const sandbox = typeof resultData?.sandbox === 'object' && resultData.sandbox !== null ? resultData.sandbox as Record<string, unknown> : undefined;
+  const output = outputForData(resultData);
 
   return {
-    toolName: toolNameFor(call) || toolNameFor(result) || 'tool',
-    risk: riskFor(callData),
-    ok: typeof resultData?.ok === 'boolean' ? resultData.ok : undefined,
-    summary: stringField(resultData?.summary),
+    toolName: toolNameForEvent(call) ?? toolNameForEvent(result) ?? 'tool',
+    risk: riskForData(callData),
+    ok: output.ok,
+    summary: output.summary,
     duration: numberField(resultData?.durationMs),
-    stdout: stringField(resultData?.stdout) ?? stringField(output.stdout),
-    stderr: stringField(resultData?.stderr) ?? stringField(output.stderr),
+    stdout: output.stdout,
+    stderr: output.stderr,
     error: stringField(resultData?.error),
-    sandboxSummary: sandbox ? sandboxSummary(sandbox) : undefined,
+    sandboxSummary: sandboxSummaryForData(resultData),
   };
-}
-
-function toolNameFor(event?: TraceEvent): string {
-  return explicitToolNameFor(event) ?? 'tool';
-}
-
-function explicitToolNameFor(event?: TraceEvent): string | undefined {
-  const data = event?.data as Record<string, unknown> | undefined;
-  return stringField(data?.name) ?? stringField(data?.tool);
-}
-
-function riskFor(data: Record<string, unknown>): string | undefined {
-  const risk = stringField(data.risk);
-  if (risk) return risk;
-  const risks = Array.isArray(data.risks) ? data.risks.filter((item): item is string => typeof item === 'string') : [];
-  if (risks.some(item => /critical/i.test(item))) return 'critical';
-  if (risks.some(item => /write|network|shell|exec|delete|danger/i.test(item))) return 'high';
-  return risks.length > 0 ? 'medium' : undefined;
-}
-
-function sandboxSummary(sandbox: Record<string, unknown>): string {
-  const mode = stringField(sandbox.mode);
-  const writeMode = stringField(sandbox.writeMode);
-  const blocked = typeof sandbox.blocked === 'boolean' ? `blocked=${sandbox.blocked}` : undefined;
-  return [mode ? `mode=${mode}` : undefined, writeMode ? `writeMode=${writeMode}` : undefined, blocked].filter(Boolean).join(' · ');
-}
-
-function stringField(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function numberField(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function parseTimestampMs(timestamp: string): number | null {

@@ -1,4 +1,5 @@
 import type { TraceEvent } from './loader';
+import { riskForData, sandboxForData, stringField as normalizeStringField, toolNameForEvent } from './trace-normalize';
 
 export type ReplayStepCategory = 'task' | 'model' | 'tool' | 'policy' | 'security' | 'sandbox' | 'diff' | 'other';
 
@@ -83,30 +84,17 @@ function summaryFor(event: TraceEvent): string {
 
 function toolSummary(event: TraceEvent): string {
   const data = event.data ?? {};
-  const toolName = stringField(data.name) ?? stringField(data.tool) ?? 'tool';
+  const toolName = toolNameForEvent(event, 'tool') ?? 'tool';
   const ok = typeof data.ok === 'boolean' ? (data.ok ? 'ok' : 'failed') : undefined;
-  const risk = riskFor(data);
+  const risk = riskForData(data);
   const pieces = [toolName, ok, risk ? `risk=${risk}` : undefined].filter(Boolean);
   return pieces.length > 0 ? pieces.join(' · ') : event.type;
 }
 
-function riskFor(data: Record<string, unknown>): string | undefined {
-  const risk = stringField(data.risk);
-  if (risk) return risk;
-  const risks = Array.isArray(data.risks) ? data.risks.filter((item): item is string => typeof item === 'string') : [];
-  if (risks.some(item => /critical/i.test(item))) return 'critical';
-  if (risks.some(item => /write|network|shell|exec|delete|danger/i.test(item))) return 'high';
-  return risks.length > 0 ? 'medium' : undefined;
-}
-
-function stringField(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
 function policySummary(data: Record<string, unknown>): string {
-  const decision = typeof data.decision === 'string' ? data.decision : undefined;
-  const reason = typeof data.reason === 'string' ? data.reason : undefined;
-  const risk = typeof data.risk === 'string' ? `risk=${data.risk}` : undefined;
+  const decision = normalizeStringField(data.decision);
+  const reason = normalizeStringField(data.reason);
+  const risk = normalizeStringField(data.risk) ? `risk=${data.risk}` : undefined;
   return [decision, reason, risk].filter(Boolean).join(' · ') || 'Policy event';
 }
 
@@ -118,7 +106,7 @@ function securitySummary(data: Record<string, unknown>): string {
 }
 
 function sandboxSummary(data: Record<string, unknown>): string {
-  const sandbox = typeof data.sandbox === 'object' && data.sandbox !== null ? data.sandbox as Record<string, unknown> : {};
+  const sandbox = sandboxForData(data) ?? {};
   const writeMode = typeof sandbox.writeMode === 'string' ? `writeMode=${sandbox.writeMode}` : undefined;
   const mode = typeof sandbox.mode === 'string' ? `mode=${sandbox.mode}` : undefined;
   const error = typeof data.error === 'string' ? data.error : undefined;
