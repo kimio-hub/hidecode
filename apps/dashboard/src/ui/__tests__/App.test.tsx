@@ -19,8 +19,8 @@ describe('App data loading', () => {
 
   it('renders the hidecode app shell by default', () => {
     render(<App />);
-    expect(screen.getByText('hidecode')).toBeInTheDocument();
-    expect(screen.getByText('Chat workspace coming next')).toBeInTheDocument();
+    expect(screen.getByText('GUI-first coding workspace')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Build with hidecode' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Run inspector' })).toBeInTheDocument();
   });
 

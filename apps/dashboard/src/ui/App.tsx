@@ -14,7 +14,7 @@ import Dashboard from './Dashboard';
 import BottomStatusBar from './components/BottomStatusBar';
 import LeftSidebar from './components/LeftSidebar';
 import RightInspector from './components/RightInspector';
-import WorkspacePlaceholder from './components/WorkspacePlaceholder';
+import HomePage from './modes/HomePage';
 
 type LoadState =
   | { status: 'ready'; events: TraceEvent[]; run: RunMeta; source: DashboardSource; sourceLabel: string }
@@ -93,7 +93,7 @@ export default function App() {
     return (
       <AppShell
         sidebar={<LeftSidebar />}
-        workspace={<WorkspacePlaceholder />}
+        workspace={<HomePage />}
         inspector={<RightInspector />}
         status={<BottomStatusBar />}
       />
