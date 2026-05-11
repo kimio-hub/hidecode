@@ -56,8 +56,44 @@ export interface RuntimeActionRequest {
   domain: DashboardActionDomain;
   action: DashboardAction;
   target?: DashboardActionTarget;
-  requiresBackend: boolean;
+  requiresBackend: true;
   clientRequestId?: string;
+}
+
+export type RuntimeActionStatus = 'accepted' | 'rejected' | 'duplicate';
+
+export interface RuntimeActionResponse {
+  status: RuntimeActionStatus;
+  accepted: boolean;
+  commandId: string;
+  traceEventId: string;
+  reason?: string;
+  queuedOperationId?: string;
+}
+
+export interface RuntimeActionAuditEvent {
+  eventId: string;
+  type: `dashboard.runtime_action.${RuntimeActionStatus}`;
+  commandId: string;
+  clientRequestId?: string;
+  domain: RuntimeActionRequest['domain'];
+  action: RuntimeActionRequest['action'];
+  target?: RuntimeActionRequest['target'];
+  receivedAt: string;
+  outcome: {
+    status: RuntimeActionStatus;
+    accepted: boolean;
+    reason?: string;
+    queuedOperationId?: string;
+  };
+}
+
+export interface RuntimeActionAuditEventInput {
+  eventId: string;
+  commandId: string;
+  request: RuntimeActionRequest;
+  response: RuntimeActionResponse;
+  receivedAt: string;
 }
 
 const BACKEND_REASON = 'Disabled until the Dashboard runtime backend API is available.';
@@ -116,8 +152,27 @@ export function toRuntimeActionRequest(intent: DashboardActionIntent, clientRequ
     domain: intent.domain,
     action: intent.action,
     ...(intent.target ? { target: intent.target } : {}),
-    requiresBackend: intent.requiresBackend,
+    requiresBackend: true,
     ...(clientRequestId ? { clientRequestId } : {}),
+  };
+}
+
+export function toRuntimeActionAuditEvent(input: RuntimeActionAuditEventInput): RuntimeActionAuditEvent {
+  return {
+    eventId: input.eventId,
+    type: `dashboard.runtime_action.${input.response.status}`,
+    commandId: input.commandId,
+    ...(input.request.clientRequestId ? { clientRequestId: input.request.clientRequestId } : {}),
+    domain: input.request.domain,
+    action: input.request.action,
+    ...(input.request.target ? { target: input.request.target } : {}),
+    receivedAt: input.receivedAt,
+    outcome: {
+      status: input.response.status,
+      accepted: input.response.accepted,
+      ...(input.response.reason ? { reason: input.response.reason } : {}),
+      ...(input.response.queuedOperationId ? { queuedOperationId: input.response.queuedOperationId } : {}),
+    },
   };
 }
 

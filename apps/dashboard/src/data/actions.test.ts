@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { DashboardActionIntent, ReplayActionIntent } from './actions';
+import type { DashboardActionIntent, ReplayActionIntent, RuntimeActionResponse } from './actions';
 import {
   buildAgentActionIntent,
   buildApprovalActionIntent,
   buildCommandActionIntent,
   buildReplayActionIntent,
   actionReasonAttributes,
+  toRuntimeActionAuditEvent,
   toRuntimeActionRequest,
 } from './actions';
 
@@ -158,6 +159,74 @@ describe('Dashboard runtime action intents', () => {
       action: 'ask-harness',
       target: { kind: 'command' },
       requiresBackend: true,
+    });
+  });
+
+  it('models accepted runtime action responses and audit events without side effects', () => {
+    const request = toRuntimeActionRequest(buildApprovalActionIntent('approve', 'approval-1'), 'client-1');
+    const response: RuntimeActionResponse = {
+      status: 'accepted',
+      accepted: true,
+      commandId: 'command-1',
+      traceEventId: 'trace-1',
+      queuedOperationId: 'operation-1',
+    };
+
+    expect(toRuntimeActionAuditEvent({ eventId: response.traceEventId, commandId: response.commandId, request, response, receivedAt: '2026-05-11T00:00:00.000Z' })).toEqual({
+      eventId: 'trace-1',
+      type: 'dashboard.runtime_action.accepted',
+      commandId: 'command-1',
+      clientRequestId: 'client-1',
+      domain: 'approval',
+      action: 'approve',
+      target: { kind: 'approval', id: 'approval-1' },
+      receivedAt: '2026-05-11T00:00:00.000Z',
+      outcome: {
+        status: 'accepted',
+        accepted: true,
+        queuedOperationId: 'operation-1',
+      },
+    });
+  });
+
+  it('models rejected and duplicate runtime action audit events with sanitized reasons', () => {
+    const request = toRuntimeActionRequest(buildReplayActionIntent('fork', { kind: 'run', id: 'run-1' }), 'client-2');
+    const rejected: RuntimeActionResponse = {
+      status: 'rejected',
+      accepted: false,
+      commandId: 'command-2',
+      traceEventId: 'trace-2',
+      reason: 'Rejected by policy check.',
+    };
+
+    expect(toRuntimeActionAuditEvent({ eventId: rejected.traceEventId, commandId: rejected.commandId, request, response: rejected, receivedAt: '2026-05-11T00:01:00.000Z' })).toEqual({
+      eventId: 'trace-2',
+      type: 'dashboard.runtime_action.rejected',
+      commandId: 'command-2',
+      clientRequestId: 'client-2',
+      domain: 'replay',
+      action: 'fork',
+      target: { kind: 'run', id: 'run-1' },
+      receivedAt: '2026-05-11T00:01:00.000Z',
+      outcome: {
+        status: 'rejected',
+        accepted: false,
+        reason: 'Rejected by policy check.',
+      },
+    });
+
+    const duplicate: RuntimeActionResponse = {
+      status: 'duplicate',
+      accepted: false,
+      commandId: 'command-2',
+      traceEventId: 'trace-2',
+      reason: 'Duplicate commandId; original trace event returned.',
+    };
+
+    expect(toRuntimeActionAuditEvent({ eventId: 'trace-duplicate', commandId: duplicate.commandId, request, response: duplicate, receivedAt: '2026-05-11T00:02:00.000Z' }).outcome).toEqual({
+      status: 'duplicate',
+      accepted: false,
+      reason: 'Duplicate commandId; original trace event returned.',
     });
   });
 });
