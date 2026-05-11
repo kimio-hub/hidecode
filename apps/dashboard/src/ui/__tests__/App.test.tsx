@@ -56,6 +56,76 @@ describe('App data loading', () => {
     expect(fetch).toHaveBeenCalledWith('/runs/demo/run.json');
   });
 
+  it('loads real smoke-shaped artifacts into trace-derived dashboard panels', async () => {
+    setSearch('?run=/runs/smoke');
+    const traceLines = [
+      JSON.stringify({
+        eventId: 'event-task-created',
+        runId: 'run-smoke',
+        taskId: 'task-smoke',
+        type: 'task.created',
+        timestamp: '2026-05-11T00:24:23.686Z',
+        actor: 'orchestrator',
+        data: { goal: 'fix failing add test' },
+      }),
+      JSON.stringify({
+        eventId: 'event-tool-finished',
+        runId: 'run-smoke',
+        taskId: 'task-smoke',
+        type: 'tool.finished',
+        timestamp: '2026-05-11T00:24:23.700Z',
+        actor: 'orchestrator',
+        data: { tool: 'test', ok: false, error: 'ENOENT: no such file or directory' },
+      }),
+      JSON.stringify({
+        eventId: 'event-task-completed',
+        runId: 'run-smoke',
+        taskId: 'task-smoke',
+        type: 'task.completed',
+        timestamp: '2026-05-11T00:24:23.704Z',
+        actor: 'orchestrator',
+        data: { summary: 'smoke completed: runtime emitted trace and report' },
+      }),
+    ].join('\n');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/trace.jsonl')) {
+        return { ok: true, status: 200, text: async () => traceLines } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          runId: 'run-smoke',
+          taskId: 'task-smoke',
+          harnessVersion: '0.1.0',
+          model: { provider: 'unknown', name: 'unknown' },
+          workspace: { repo: '/workspace/fixtures/bugfix-ts' },
+          artifacts: {
+            root: '/workspace/fixtures/bugfix-ts/.runs/run-smoke',
+            trace: '/workspace/fixtures/bugfix-ts/.runs/run-smoke/trace.jsonl',
+            run: '/workspace/fixtures/bugfix-ts/.runs/run-smoke/run.json',
+            report: '/workspace/fixtures/bugfix-ts/.runs/run-smoke/report.md',
+          },
+          summary: 'smoke completed: runtime emitted trace and report',
+          steps: 2,
+          durationMs: 53,
+          budget: { steps: 2, toolCalls: 1, exceeded: false },
+          snapshots: 0,
+        }),
+      } as Response;
+    }));
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText('task-smoke').length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByText('Run URL: /runs/smoke')).toBeInTheDocument();
+    expect(screen.getAllByText('Replay Debug').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Multi-Agent Board')).toBeInTheDocument();
+    expect(screen.getByText('fix failing add test')).toBeInTheDocument();
+    expect(screen.getAllByText('smoke completed: runtime emitted trace and report').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('orchestrator').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('shows an error state when loading fails', async () => {
     setSearch('?trace=/missing/trace.jsonl');
     vi.stubGlobal('fetch', vi.fn(async () => ({
