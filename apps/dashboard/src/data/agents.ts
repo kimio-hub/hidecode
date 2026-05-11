@@ -38,7 +38,7 @@ export function deriveAgentBoard(events: TraceEvent[]): AgentBoardItem[] {
 
 function groupToBoardItem(group: AgentAccumulator): AgentBoardItem {
   const ordered = [...group.events].sort((a, b) => compareTimestampAsc(a.timestamp, b.timestamp));
-  const latest = ordered[ordered.length - 1] ?? group.events[0]!;
+  const latest = latestValidEvent(ordered) ?? ordered[ordered.length - 1] ?? group.events[0]!;
   const blockers = unique(ordered.flatMap(blockersFor));
   const handoffs = unique(ordered.flatMap(handoffsFor));
   const hasTerminalLatest = latest.type === 'task.completed';
@@ -57,6 +57,14 @@ function groupToBoardItem(group: AgentAccumulator): AgentBoardItem {
     handoffs,
     focus: focusFor(latest),
   };
+}
+
+function latestValidEvent(events: TraceEvent[]): TraceEvent | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event && parseTimestampMs(event.timestamp) !== null) return event;
+  }
+  return undefined;
 }
 
 function agentIdFor(event: TraceEvent): string {

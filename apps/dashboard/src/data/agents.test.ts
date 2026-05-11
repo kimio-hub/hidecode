@@ -40,13 +40,19 @@ describe('deriveAgentBoard', () => {
     expect(board.find(item => item.id === 'agent-d')?.blockers).toContain('waiting on review');
   });
 
-  it('tracks handoffs and falls back to idle after terminal task completion', () => {
+  it('uses latest valid timestamp for agent status and ignores invalid timestamps for latest event selection', () => {
     const board = deriveAgentBoard([
-      event({ eventId: 'a1', type: 'task.updated', timestamp: '2026-05-10T10:00:01.000Z', actor: '', data: { handoffTo: 'reviewer', summary: 'Ready for review' } }),
-      event({ eventId: 'b1', type: 'task.completed', timestamp: '2026-05-10T10:00:02.000Z', actor: 'finisher', data: { summary: 'Done' } }),
+      event({ eventId: 'valid', type: 'task.completed', timestamp: '2026-05-10T10:00:02.000Z', actor: 'agent-a', data: { summary: 'Done' } }),
+      event({ eventId: 'invalid', type: 'tool.call', timestamp: 'not-a-date', actor: 'agent-a', data: { name: 'terminal' } }),
     ]);
 
-    expect(board.find(item => item.id === 'unknown')).toMatchObject({ status: 'handoff', handoffs: ['to reviewer'] });
-    expect(board.find(item => item.id === 'finisher')).toMatchObject({ status: 'idle', focus: 'Done' });
+    expect(board).toHaveLength(1);
+    expect(board[0]).toMatchObject({
+      id: 'agent-a',
+      status: 'idle',
+      lastEventType: 'task.completed',
+      lastSeen: '2026-05-10T10:00:02.000Z',
+      focus: 'Done',
+    });
   });
 });
