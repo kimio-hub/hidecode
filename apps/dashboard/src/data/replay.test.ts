@@ -68,4 +68,22 @@ describe('deriveReplaySteps', () => {
     expect(steps[1]?.actor).toBe('unknown');
     expect(steps[0]?.category).toBe('task');
   });
+
+  it('summarizes real orchestrator tool events with data.tool and risks arrays', () => {
+    const steps = deriveReplaySteps([
+      event({
+        eventId: 'real-tool',
+        type: 'tool.requested',
+        timestamp: '2026-05-10T10:00:00.000Z',
+        actor: 'runtime',
+        data: { tool: 'execute_shell', risks: ['write', 'network'] },
+      }),
+    ]);
+
+    expect(steps[0]).toMatchObject({
+      id: 'real-tool',
+      category: 'tool',
+      summary: 'execute_shell · risk=high',
+    });
+  });
 });

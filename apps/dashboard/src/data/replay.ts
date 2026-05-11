@@ -83,11 +83,24 @@ function summaryFor(event: TraceEvent): string {
 
 function toolSummary(event: TraceEvent): string {
   const data = event.data ?? {};
-  const toolName = typeof data.name === 'string' ? data.name : 'tool';
+  const toolName = stringField(data.name) ?? stringField(data.tool) ?? 'tool';
   const ok = typeof data.ok === 'boolean' ? (data.ok ? 'ok' : 'failed') : undefined;
-  const risk = typeof data.risk === 'string' ? `risk=${data.risk}` : undefined;
-  const pieces = [toolName, ok, risk].filter(Boolean);
+  const risk = riskFor(data);
+  const pieces = [toolName, ok, risk ? `risk=${risk}` : undefined].filter(Boolean);
   return pieces.length > 0 ? pieces.join(' · ') : event.type;
+}
+
+function riskFor(data: Record<string, unknown>): string | undefined {
+  const risk = stringField(data.risk);
+  if (risk) return risk;
+  const risks = Array.isArray(data.risks) ? data.risks.filter((item): item is string => typeof item === 'string') : [];
+  if (risks.some(item => /critical/i.test(item))) return 'critical';
+  if (risks.some(item => /write|network|shell|exec|delete|danger/i.test(item))) return 'high';
+  return risks.length > 0 ? 'medium' : undefined;
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function policySummary(data: Record<string, unknown>): string {
