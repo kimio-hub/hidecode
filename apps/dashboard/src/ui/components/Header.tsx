@@ -22,7 +22,7 @@ export default function Header({ run, events, sourceLabel = 'Mock' }: Props) {
   // Extract budget info from events
   const budgetEvent = events.find(e => e.data?.budget);
   const budgetStr = budgetEvent?.data?.budget as string | undefined;
-  const toolCount = events.filter(e => e.type === 'tool.started' || e.type === 'tool.call').length;
+  const toolCount = countToolActivity(events);
   const securityFindings = events.filter(e => e.type === 'security.finding').length;
 
   return (
@@ -115,4 +115,10 @@ export default function Header({ run, events, sourceLabel = 'Mock' }: Props) {
       </div>
     </header>
   );
+}
+
+function countToolActivity(events: TraceEvent[]): number {
+  const startsOrCalls = events.filter(e => e.type === 'tool.started' || e.type === 'tool.call').length;
+  if (startsOrCalls > 0) return startsOrCalls;
+  return events.filter(e => e.type === 'tool.requested').length;
 }

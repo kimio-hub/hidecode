@@ -1,4 +1,5 @@
 import type { TraceEvent } from './loader';
+import { toolNameForEvent } from './trace-normalize';
 
 export type AgentStatus = 'active' | 'idle' | 'blocked' | 'handoff';
 
@@ -119,7 +120,7 @@ function focusFor(event: TraceEvent): string {
 
 function toolFocus(event: TraceEvent): string | undefined {
   if (!event.type.startsWith('tool.')) return undefined;
-  const name = stringField(event.data?.name) ?? 'tool';
+  const name = toolNameForEvent(event, 'tool') ?? 'tool';
   const ok = typeof event.data?.ok === 'boolean' ? (event.data.ok ? 'ok' : 'failed') : undefined;
   return [name, ok].filter(Boolean).join(' · ');
 }

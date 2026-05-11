@@ -55,4 +55,17 @@ describe('deriveAgentBoard', () => {
       focus: 'Done',
     });
   });
+
+  it('uses current runtime tool field when describing latest tool focus', () => {
+    const board = deriveAgentBoard([
+      event({ eventId: 'tool-finished', type: 'tool.finished', timestamp: '2026-05-10T10:00:01.000Z', actor: 'agent-a', data: { tool: 'run', ok: false } }),
+    ]);
+
+    expect(board).toHaveLength(1);
+    expect(board[0]).toMatchObject({
+      id: 'agent-a',
+      lastEventType: 'tool.finished',
+      focus: 'run · failed',
+    });
+  });
 });

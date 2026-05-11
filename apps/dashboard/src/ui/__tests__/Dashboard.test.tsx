@@ -179,7 +179,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('2750ms')).toBeInTheDocument();
     fireEvent.click(screen.getAllByText('execute_shell')[0]);
     expect(screen.getByText('PASS apps/dashboard/src/ui/__tests__/Dashboard.test.tsx')).toBeInTheDocument();
-    expect(screen.getByText('Dashboard tests passed inside sandbox')).toBeInTheDocument();
+    expect(screen.getAllByText('Dashboard tests passed inside sandbox').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('mode=ephemeral · writeMode=workspace · blocked=false')).toBeInTheDocument();
 
     expect(screen.getByText('Approval Queue')).toBeInTheDocument();

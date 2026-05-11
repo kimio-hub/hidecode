@@ -1,5 +1,6 @@
 import type { TraceEvent } from '../../data/mock';
-import { FileText, Terminal, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { outputForData, stringField, stringifySummary } from '../../data/trace-normalize';
 
 interface Props {
   events: TraceEvent[];
@@ -7,15 +8,17 @@ interface Props {
 
 export default function EvidencePanel({ events }: Props) {
   const evidence = events.filter(e =>
-    e.type === 'tool.result' || e.type === 'model.completed'
+    e.type === 'tool.result' || e.type === 'tool.finished' || e.type === 'model.completed'
   );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {evidence.map(evt => {
         const data = evt.data as Record<string, unknown>;
-        const ok = data.ok as boolean | undefined;
-        const summary = data.summary as string | undefined;
+        const output = outputForData(data);
+        const ok = output.ok;
+        const summary = output.summary ?? stringField(data.error);
+        const evidenceItems = Array.isArray(data.evidence) ? data.evidence : [];
 
         return (
           <div key={evt.eventId} style={{
@@ -37,6 +40,15 @@ export default function EvidencePanel({ events }: Props) {
             </div>
             {summary && (
               <div style={{ fontSize: '12px', color: '#ccc', lineHeight: 1.4 }}>{summary}</div>
+            )}
+            {evidenceItems.length > 0 && (
+              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {evidenceItems.map((item, index) => (
+                  <div key={index} style={{ fontSize: '11px', color: '#888', lineHeight: 1.4 }}>
+                    {stringifySummary(item)}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         );
