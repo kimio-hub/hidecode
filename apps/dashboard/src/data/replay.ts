@@ -1,5 +1,5 @@
 import type { TraceEvent } from './loader';
-import { riskForData, sandboxForData, stringField as normalizeStringField, toolNameForEvent } from './trace-normalize';
+import { outputForData, riskForData, sandboxForData, stringField as normalizeStringField, toolNameForEvent } from './trace-normalize';
 
 export type ReplayStepCategory = 'task' | 'model' | 'tool' | 'policy' | 'security' | 'sandbox' | 'diff' | 'other';
 
@@ -85,9 +85,12 @@ function summaryFor(event: TraceEvent): string {
 function toolSummary(event: TraceEvent): string {
   const data = event.data ?? {};
   const toolName = toolNameForEvent(event, 'tool') ?? 'tool';
-  const ok = typeof data.ok === 'boolean' ? (data.ok ? 'ok' : 'failed') : undefined;
+  const output = outputForData(data);
+  const ok = output.ok !== undefined
+    ? (output.ok ? 'ok' : 'failed')
+    : typeof data.ok === 'boolean' ? (data.ok ? 'ok' : 'failed') : undefined;
   const risk = riskForData(data);
-  const pieces = [toolName, ok, risk ? `risk=${risk}` : undefined].filter(Boolean);
+  const pieces = [toolName, ok, risk ? `risk=${risk}` : undefined, output.summary].filter(Boolean);
   return pieces.length > 0 ? pieces.join(' · ') : event.type;
 }
 

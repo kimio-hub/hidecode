@@ -69,21 +69,28 @@ describe('deriveReplaySteps', () => {
     expect(steps[0]?.category).toBe('task');
   });
 
-  it('summarizes real orchestrator tool events with data.tool and risks arrays', () => {
+  it('summarizes real orchestrator tool finished events with nested output status and summary', () => {
     const steps = deriveReplaySteps([
       event({
-        eventId: 'real-tool',
-        type: 'tool.requested',
+        eventId: 'real-tool-finished',
+        type: 'tool.finished',
         timestamp: '2026-05-10T10:00:00.000Z',
         actor: 'runtime',
-        data: { tool: 'execute_shell', risks: ['write', 'network'] },
+        data: {
+          tool: 'execute_shell',
+          output: {
+            ok: true,
+            summary: 'Dashboard tests passed inside sandbox',
+            stdout: 'PASS apps/dashboard/src/ui/__tests__/Dashboard.test.tsx',
+          },
+        },
       }),
     ]);
 
     expect(steps[0]).toMatchObject({
-      id: 'real-tool',
+      id: 'real-tool-finished',
       category: 'tool',
-      summary: 'execute_shell · risk=high',
+      summary: 'execute_shell · ok · Dashboard tests passed inside sandbox',
     });
   });
 });
