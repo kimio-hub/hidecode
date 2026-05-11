@@ -12,6 +12,7 @@ describe('hidecode app mode model', () => {
     expect(parseHidecodeAppState('?mode=review')).toEqual({ mode: 'review' });
     expect(parseHidecodeAppState('?mode=replay')).toEqual({ mode: 'replay' });
     expect(parseHidecodeAppState('?mode=monitor')).toEqual({ mode: 'monitor' });
+    expect(parseHidecodeAppState('?mode=chat&api=http%3A%2F%2F127.0.0.1%3A8787')).toEqual({ mode: 'chat' });
   });
 
   it('falls back to home when an unsupported mode is provided', () => {

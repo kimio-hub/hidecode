@@ -10,6 +10,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "app": "pnpm --filter @world-harness/cli start app",
     "smoke": "pnpm --filter @world-harness/cli start smoke --repo ./fixtures/bugfix-ts --goal \"fix failing add test\""
   },
   "devDependencies": {

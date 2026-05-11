@@ -46,6 +46,11 @@ export interface BackendCreateMessageResponse {
   run?: Omit<BackendSessionRun, 'id' | 'createdAt'>;
 }
 
+export function getBackendBaseUrl(search = window.location.search): string {
+  const params = new URLSearchParams(search);
+  return params.get('api') ?? '';
+}
+
 export function sessionMessagesToChatMessages(messages: BackendSessionMessage[]): ChatMessage[] {
   return messages.map((message) => ({
     id: message.id,

@@ -8,6 +8,8 @@ import { runSingleAgentTask } from '@world-harness/orchestrator';
 import { createRepoTools, LocalSandbox } from '@world-harness/tools';
 import { defaultPolicy } from '@world-harness/policy';
 
+import { runAppCommand, resolveWorkspaceRoot } from './app-command.js';
+
 const program = new Command();
 program.name('world-harness').version(HARNESS_VERSION);
 
@@ -58,6 +60,26 @@ function createLocalSandbox(opts: { sandboxTimeoutMs?: string; sandboxMaxBuffer?
     env: {},
   });
 }
+
+// ─── app: launch local GUI workspace ────────────────────────────
+program.command('app')
+  .description('Start the hidecode local GUI app with backend and dashboard')
+  .option('--project <path>', 'Project/workspace root to open')
+  .option('--host <host>', 'Host for local app servers', '127.0.0.1')
+  .option('--backend-port <n>', 'Backend server port', '8787')
+  .option('--dashboard-port <n>', 'Dashboard dev server port', '5173')
+  .option('--open', 'Open the app URL in a browser', false)
+  .action(async (opts) => {
+    const workspaceRoot = resolveWorkspaceRoot(process.cwd());
+    await runAppCommand({
+      repoRoot: workspaceRoot,
+      projectRoot: resolve(opts.project ?? workspaceRoot),
+      host: opts.host,
+      backendPort: parseIntOption(opts.backendPort, 8787),
+      dashboardPort: parseIntOption(opts.dashboardPort, 5173),
+      open: opts.open,
+    });
+  });
 
 // ─── inspect: read and display a trace ─────────────────────────
 program.command('inspect').argument('<trace>').action(async (trace) => {

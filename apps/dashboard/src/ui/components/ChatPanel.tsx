@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { mockChatMessages, type ChatMessage } from '../../data/chat';
 import type { TraceEvent } from '../../data/loader';
 import {
+  getBackendBaseUrl,
   createBackendSession,
   postBackendMessage,
   sessionEventsToTraceEvents,
@@ -28,9 +29,10 @@ export default function ChatPanel({ onReview, onEventsChange, projectPath = '' }
     setIsSubmitting(true);
     setStatus('Running scripted backend session…');
     try {
-      const activeSession = session ?? await createBackendSession(projectPath);
+      const baseUrl = getBackendBaseUrl();
+      const activeSession = session ?? await createBackendSession(projectPath, baseUrl);
       setSession(activeSession);
-      const result = await postBackendMessage(activeSession.id, content);
+      const result = await postBackendMessage(activeSession.id, content, baseUrl);
       setSession(result.session);
       setMessages(sessionMessagesToChatMessages(result.session.messages));
       onEventsChange?.(sessionEventsToTraceEvents(result.session.events));
