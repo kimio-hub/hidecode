@@ -6,6 +6,9 @@ import {
   buildCommandActionIntent,
   buildReplayActionIntent,
   actionReasonAttributes,
+  DEFAULT_RUNTIME_ACTION_READINESS,
+  normalizeRuntimeActionReadiness,
+  runtimeActionReadinessMessage,
   toRuntimeActionAuditEvent,
   toRuntimeActionRequest,
 } from './actions';
@@ -18,6 +21,116 @@ function expectDisabledBackendIntent(intent: DashboardActionIntent, expected: Pa
   });
   expect(intent.reason).toMatch(/backend API/i);
 }
+
+describe('Dashboard runtime action readiness', () => {
+  it('defaults to no backend configured with action submission disabled', () => {
+    expect(DEFAULT_RUNTIME_ACTION_READINESS).toEqual({
+      state: 'not-configured',
+      canSubmitActions: false,
+      reason: 'Dashboard runtime actions backend is not configured.',
+    });
+
+    expect(runtimeActionReadinessMessage(DEFAULT_RUNTIME_ACTION_READINESS)).toBe(
+      'Runtime actions unavailable: backend not configured.',
+    );
+  });
+
+  it('models a configured backend that is offline or unhealthy', () => {
+    expect(
+      runtimeActionReadinessMessage({
+        state: 'offline',
+        canSubmitActions: false,
+        reason: 'Dashboard runtime actions backend is unreachable.',
+        checkedAt: '2026-05-11T00:00:00.000Z',
+        backendVersion: 'runtime-0.1.0',
+        contractVersion: 'dashboard-runtime-actions.v1',
+        lastError: 'Health check timed out.',
+      }),
+    ).toBe('Runtime actions unavailable: backend offline. Dashboard runtime actions backend is unreachable. Last error: Health check timed out.');
+  });
+
+  it('models an online backend that remains preview-only and cannot submit actions', () => {
+    expect(
+      runtimeActionReadinessMessage({
+        state: 'preview-only',
+        canSubmitActions: false,
+        reason: 'Runtime actions are visible for preview while submission remains policy-gated.',
+        checkedAt: '2026-05-11T00:01:00.000Z',
+        backendVersion: 'runtime-0.2.0',
+        contractVersion: 'dashboard-runtime-actions.v1',
+      }),
+    ).toBe('Runtime actions preview only: Runtime actions are visible for preview while submission remains policy-gated.');
+  });
+
+  it('models an online contract-compatible backend as action-submission ready', () => {
+    expect(
+      runtimeActionReadinessMessage({
+        state: 'online',
+        canSubmitActions: true,
+        reason: 'Runtime action backend is online and contract-compatible.',
+        checkedAt: '2026-05-11T00:02:00.000Z',
+        backendVersion: 'runtime-1.0.0',
+        contractVersion: 'dashboard-runtime-actions.v1',
+      }),
+    ).toBe('Runtime actions ready: Runtime action backend is online and contract-compatible.');
+  });
+  it('normalizes absent readiness to the safe default', () => {
+    expect(normalizeRuntimeActionReadiness()).toEqual(DEFAULT_RUNTIME_ACTION_READINESS);
+  });
+
+  it('normalizes incoherent unavailable readiness states to non-submittable', () => {
+    expect(
+      normalizeRuntimeActionReadiness({
+        state: 'offline',
+        canSubmitActions: true,
+        reason: 'Backend health check failed.',
+        contractVersion: 'dashboard-runtime-actions.v1',
+        lastError: 'ECONNREFUSED',
+      }),
+    ).toEqual({
+      state: 'offline',
+      canSubmitActions: false,
+      reason: 'Backend health check failed.',
+      contractVersion: 'dashboard-runtime-actions.v1',
+      lastError: 'ECONNREFUSED',
+    });
+
+    expect(
+      normalizeRuntimeActionReadiness({
+        state: 'preview-only',
+        canSubmitActions: true,
+        reason: 'Preview mode only.',
+        contractVersion: 'dashboard-runtime-actions.v1',
+      }),
+    ).toMatchObject({ state: 'preview-only', canSubmitActions: false });
+  });
+
+  it('only preserves submit capability for online contract-compatible readiness', () => {
+    expect(
+      normalizeRuntimeActionReadiness({
+        state: 'online',
+        canSubmitActions: true,
+        reason: 'Runtime action backend is online and contract-compatible.',
+        contractVersion: 'dashboard-runtime-actions.v1',
+        backendVersion: 'runtime-1.0.0',
+      }),
+    ).toEqual({
+      state: 'online',
+      canSubmitActions: true,
+      reason: 'Runtime action backend is online and contract-compatible.',
+      contractVersion: 'dashboard-runtime-actions.v1',
+      backendVersion: 'runtime-1.0.0',
+    });
+
+    expect(
+      normalizeRuntimeActionReadiness({
+        state: 'online',
+        canSubmitActions: true,
+        reason: 'Runtime action backend is online with an unknown contract.',
+      }),
+    ).toMatchObject({ state: 'online', canSubmitActions: false });
+  });
+});
 
 describe('Dashboard runtime action intents', () => {
   it('models approval approve/reject actions as disabled backend intents with target ids and target metadata', () => {

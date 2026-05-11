@@ -52,6 +52,24 @@ export interface DashboardActionReasonAttributes {
   'aria-description': string;
 }
 
+export type DashboardRuntimeActionReadinessState = 'not-configured' | 'offline' | 'online' | 'preview-only';
+
+export interface DashboardRuntimeActionReadiness {
+  state: DashboardRuntimeActionReadinessState;
+  canSubmitActions: boolean;
+  reason: string;
+  checkedAt?: string;
+  backendVersion?: string;
+  contractVersion?: 'dashboard-runtime-actions.v1';
+  lastError?: string;
+}
+
+export const DEFAULT_RUNTIME_ACTION_READINESS: DashboardRuntimeActionReadiness = {
+  state: 'not-configured',
+  canSubmitActions: false,
+  reason: 'Dashboard runtime actions backend is not configured.',
+};
+
 export interface RuntimeActionRequest {
   domain: DashboardActionDomain;
   action: DashboardAction;
@@ -145,6 +163,36 @@ export function actionReasonAttributes(intent: Pick<DashboardActionIntent, 'reas
     title: intent.reason,
     'aria-description': intent.reason,
   };
+}
+
+export function runtimeActionReadinessMessage(status: DashboardRuntimeActionReadiness): string {
+  switch (status.state) {
+    case 'not-configured':
+      return 'Runtime actions unavailable: backend not configured.';
+    case 'offline':
+      return `Runtime actions unavailable: backend offline. ${status.reason}${status.lastError ? ` Last error: ${status.lastError}` : ''}`;
+    case 'preview-only':
+      return `Runtime actions preview only: ${status.reason}`;
+    case 'online':
+      return `Runtime actions ready: ${status.reason}`;
+  }
+}
+
+export function normalizeRuntimeActionReadiness(input?: Partial<DashboardRuntimeActionReadiness>): DashboardRuntimeActionReadiness {
+  if (!input?.state) return DEFAULT_RUNTIME_ACTION_READINESS;
+
+  const normalized: DashboardRuntimeActionReadiness = {
+    state: input.state,
+    canSubmitActions: input.state === 'online' && input.contractVersion === 'dashboard-runtime-actions.v1' && input.canSubmitActions === true,
+    reason: input.reason ?? DEFAULT_RUNTIME_ACTION_READINESS.reason,
+    ...(input.checkedAt ? { checkedAt: input.checkedAt } : {}),
+    ...(input.backendVersion ? { backendVersion: input.backendVersion } : {}),
+    ...(input.contractVersion ? { contractVersion: input.contractVersion } : {}),
+    ...(input.lastError ? { lastError: input.lastError } : {}),
+  };
+
+  if (normalized.state === 'online' && normalized.canSubmitActions) return normalized;
+  return { ...normalized, canSubmitActions: false };
 }
 
 export function toRuntimeActionRequest(intent: DashboardActionIntent, clientRequestId?: string): RuntimeActionRequest {

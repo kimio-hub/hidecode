@@ -1,69 +1,60 @@
-# Dashboard Runtime Actions Backend Contract Follow-up Plan
+# Dashboard Runtime Actions Backend Contract Plan
 
-> **For Hermes:** Continue the autonomous loop: assess current state, implement one small TDD slice, verify dashboard + full repo, run read-only review, commit/push, then update the next plan. Do not create cron/jobs.
+> **For Hermes:** Continue on `/root/world-harness` branch `main`. Use up to 3 subagents when clean. Keep browser actions disabled until backend contract tests and sanitized audit traces exist. Do not create cron/jobs or read secrets.
 
-## Current state
+## Completed before this plan
 
-Completed in recent cycles:
-- Shared trace normalization helpers are used across Tool Timeline, Replay Debug, Approval Queue, and real orchestrator dashboard fixtures.
-- Runtime controls are modeled as pure disabled `DashboardActionIntent` values.
-- Action intents include explicit `target.kind` metadata (`approval`, `replay-step`, `run`, `agent`, `command`).
-- `toRuntimeActionRequest(intent, clientRequestId)` now projects disabled intents into a pure future backend request envelope without network calls.
-- `docs/DASHBOARD_RUNTIME_ACTIONS.md` documents the base request envelope and current read-only boundary.
-- Full verification passed after the request helper: dashboard test/typecheck/build plus repo `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm smoke`.
+- Runtime action intents now carry explicit domain/action/target metadata.
+- Runtime action request/response/audit-event TypeScript contract exists in `apps/dashboard/src/data/actions.ts`.
+- Runtime action readiness model exists with safe normalization:
+  - absent readiness => `not-configured`, `canSubmitActions: false`
+  - `not-configured`/`offline`/`preview-only` => forced non-submittable
+  - `online` may submit only with `contractVersion: 'dashboard-runtime-actions.v1'`
+- Dashboard can render provided readiness fixtures while all controls remain disabled.
 
-## Remaining design gap
+## Next small implementation slice
 
-The request envelope now exists, but backend response/event shapes and endpoint-specific payload semantics are still high-level. The next step should make the contract precise enough that a future backend implementation can be tested without changing browser behavior.
-
-## Task 1: Add typed runtime action response/event contracts
+### Task 1: Add backend contract fixture module
 
 **Files:**
-- Modify: `apps/dashboard/src/data/actions.ts`
-- Modify: `apps/dashboard/src/data/actions.test.ts`
+
+- `apps/dashboard/src/data/runtimeContract.ts`
+- `apps/dashboard/src/data/runtimeContract.test.ts`
 
 **Behavior:**
-- Add pure TypeScript interfaces for a future backend response, e.g. `RuntimeActionResponse` with:
-  - `accepted: boolean`
-  - `status: 'accepted' | 'rejected' | 'queued'`
-  - `traceEventId?: string`
-  - `reason?: string`
-- Add a trace/audit event envelope type or helper describing accepted/rejected action attempts.
-- Keep everything side-effect-free; no fetch/network calls.
+
+- Define exported constants for endpoint paths:
+  - `RUNTIME_ACTION_READINESS_ENDPOINT = '/api/dashboard/runtime-actions/readiness'`
+  - `RUNTIME_ACTION_SUBMIT_ENDPOINT = '/api/dashboard/runtime-actions'`
+- Define pure validators/guards for backend payloads:
+  - `isRuntimeActionReadinessPayload(value): value is DashboardRuntimeActionReadiness`
+  - `isRuntimeActionResponsePayload(value): value is RuntimeActionResponse`
+- Reuse existing types from `actions.ts`; do not duplicate contracts.
+- Reject malformed payloads, unknown statuses, missing command/trace ids, or readiness without known states.
+- No fetch/browser mutation implementation yet.
 
 **TDD:**
-1. Add failing tests for accepted and rejected response/audit shapes.
-2. Implement minimal types/helpers.
-3. Run `pnpm --filter @world-harness/dashboard test -- src/data/actions.test.ts` and dashboard typecheck.
 
-## Task 2: Tighten request target semantics
+1. Add tests for valid readiness and response payloads.
+2. Add tests rejecting malformed/unknown/partial payloads.
+3. Run focused tests and dashboard package verification.
 
-**Files:**
-- Modify: `apps/dashboard/src/data/actions.ts`
-- Modify: `apps/dashboard/src/data/actions.test.ts`
-
-**Behavior:**
-- Consider making `RuntimeActionRequest` a discriminated union keyed by `domain` to mirror `DashboardActionIntent`.
-- Preserve current builder ergonomics.
-- Add coverage for target omission where intended, such as run-level replay actions.
-
-## Task 3: Document endpoint-level backend seam
+### Task 2: Document backend ownership boundary
 
 **Files:**
-- Modify: `docs/DASHBOARD_RUNTIME_ACTIONS.md`
+
+- `docs/plans/dashboard-runtime-actions-backend-contract.md` (this file)
 
 **Behavior:**
-- Specify proposed endpoints or command/event envelopes for:
-  - approval approve/reject
-  - replay/fork/save-eval
-  - agent assign/handoff/unblock
-  - ask-harness command submission
-- Include idempotency, no-secret payload requirement, server-side policy/sandbox/budget checks, and trace event emission for accepted/rejected attempts.
-- State again that current browser UI remains read-only until backend support exists.
 
-## Verification
+- Keep Dashboard read-only until backend/service package exposes contract-tested endpoints.
+- Future implementation owner should add server-side tests before any browser fetch wiring.
+- Audit event emission must sanitize reasons/output and never include secrets.
+
+## Verification commands
 
 ```bash
+pnpm --filter @world-harness/dashboard test -- src/data/runtimeContract.test.ts
 pnpm --filter @world-harness/dashboard test
 pnpm --filter @world-harness/dashboard typecheck
 pnpm --filter @world-harness/dashboard build
@@ -73,4 +64,9 @@ pnpm build
 pnpm smoke
 ```
 
-Run an independent read-only review before commit/push.
+## Non-goals
+
+- Do not add browser fetch calls.
+- Do not enable approval/replay/agent/command buttons.
+- Do not implement backend routes in Dashboard.
+- Do not include real secrets in fixtures, logs, audit events, or docs.

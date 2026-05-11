@@ -1,5 +1,12 @@
 import type { TraceEvent, RunMeta } from '../data/mock';
-import { actionReasonAttributes, buildCommandActionIntent } from '../data/actions';
+import {
+  actionReasonAttributes,
+  buildCommandActionIntent,
+  DEFAULT_RUNTIME_ACTION_READINESS,
+  type DashboardRuntimeActionReadiness,
+  normalizeRuntimeActionReadiness,
+  runtimeActionReadinessMessage,
+} from '../data/actions';
 import { deriveApprovalQueue } from '../data/approvals';
 import { deriveReplaySteps } from '../data/replay';
 import { deriveAgentBoard } from '../data/agents';
@@ -17,6 +24,7 @@ interface Props {
   events: TraceEvent[];
   run: RunMeta;
   sourceLabel?: string;
+  runtimeActionReadiness?: DashboardRuntimeActionReadiness;
 }
 
 const navItems = [
@@ -26,12 +34,14 @@ const navItems = [
   { label: 'Agents', status: 'Board' },
 ];
 
-export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) {
+export default function Dashboard({ events, run, sourceLabel = 'Mock', runtimeActionReadiness: runtimeActionReadinessInput }: Props) {
   const toolEvents = events.filter(e => e.type.startsWith('tool.'));
   const approvalQueue = deriveApprovalQueue(events);
   const replaySteps = deriveReplaySteps(events);
   const agentBoard = deriveAgentBoard(events);
   const askHarnessIntent = buildCommandActionIntent('ask-harness');
+  const runtimeActionReadiness = normalizeRuntimeActionReadiness(runtimeActionReadinessInput ?? DEFAULT_RUNTIME_ACTION_READINESS);
+  const runtimeActionReadinessCopy = runtimeActionReadinessMessage(runtimeActionReadiness);
   const riskEvents = events.filter(e => e.type.includes('policy') || e.type === 'security.finding');
   const duration = formatDuration(events);
 
@@ -131,6 +141,21 @@ export default function Dashboard({ events, run, sourceLabel = 'Mock' }: Props) 
               <DockPill label="Terminal" />
               <DockAction label={askHarnessIntent.label} reasonAttributes={actionReasonAttributes(askHarnessIntent)} />
             </div>
+          </div>
+          <div
+            role="status"
+            aria-label="Runtime action readiness"
+            style={{
+              border: '1px solid #3f2a14',
+              borderRadius: '10px',
+              background: 'rgba(120, 53, 15, 0.18)',
+              padding: '10px 12px',
+              color: '#fbbf24',
+              fontSize: '12px',
+              marginBottom: '10px',
+            }}
+          >
+            {runtimeActionReadinessCopy}
           </div>
           <div style={{
             border: '1px solid #23233a',

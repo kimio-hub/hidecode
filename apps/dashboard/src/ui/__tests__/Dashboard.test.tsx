@@ -38,6 +38,42 @@ describe('Dashboard', () => {
     expect(screen.getByRole('button', { name: 'Ask Harness' })).toHaveAttribute('title', expect.stringMatching(/command submission is disabled until the dashboard runtime backend api is available/i));
   });
 
+  it('surfaces runtime action readiness as unavailable without enabling controls', () => {
+    render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
+
+    expect(screen.getByRole('status', { name: 'Runtime action readiness' })).toHaveTextContent(
+      'Runtime actions unavailable: backend not configured',
+    );
+    expect(screen.getByText(/read-only dock placeholder/i)).toBeInTheDocument();
+
+    const askHarnessButton = screen.getByRole('button', { name: 'Ask Harness' });
+    expect(askHarnessButton).toBeDisabled();
+    expect(askHarnessButton).toHaveAttribute(
+      'aria-description',
+      expect.stringMatching(/command submission is disabled until the dashboard runtime backend api is available/i),
+    );
+  });
+
+  it('renders provided runtime action readiness fixtures without enabling controls', () => {
+    render(
+      <Dashboard
+        events={MOCK_EVENTS}
+        run={MOCK_RUN}
+        runtimeActionReadiness={{
+          state: 'preview-only',
+          canSubmitActions: true,
+          reason: 'Runtime actions are visible for preview while submission remains policy-gated.',
+          contractVersion: 'dashboard-runtime-actions.v1',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('status', { name: 'Runtime action readiness' })).toHaveTextContent(
+      'Runtime actions preview only: Runtime actions are visible for preview while submission remains policy-gated.',
+    );
+    expect(screen.getByRole('button', { name: 'Ask Harness' })).toBeDisabled();
+  });
+
   it('renders read-only approval queue items', () => {
     render(<Dashboard events={MOCK_EVENTS} run={MOCK_RUN} />);
     expect(screen.getByText('Approval Queue')).toBeInTheDocument();
