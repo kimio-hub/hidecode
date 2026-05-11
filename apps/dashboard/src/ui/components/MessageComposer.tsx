@@ -1,10 +1,19 @@
-export default function MessageComposer() {
+interface MessageComposerProps {
+  onReview?: () => void;
+}
+
+export default function MessageComposer({ onReview }: MessageComposerProps) {
   return (
     <form aria-label="Message composer" style={styles.composer}>
       <textarea aria-label="Message hidecode" placeholder="Ask hidecode to fix, explain, review, or plan…" style={styles.textarea} />
       <div style={styles.actions}>
         {['Run', 'Plan', 'Review', 'Stop'].map((action) => (
-          <button key={action} type="button" style={action === 'Run' ? styles.primaryButton : styles.secondaryButton}>
+          <button
+            key={action}
+            type="button"
+            onClick={action === 'Review' ? onReview : undefined}
+            style={action === 'Run' ? styles.primaryButton : styles.secondaryButton}
+          >
             {action}
           </button>
         ))}

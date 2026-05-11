@@ -3,7 +3,11 @@ import MessageComposer from './MessageComposer';
 import MessageList from './MessageList';
 import RunProgress from './RunProgress';
 
-export default function ChatPanel() {
+interface ChatPanelProps {
+  onReview?: () => void;
+}
+
+export default function ChatPanel({ onReview }: ChatPanelProps) {
   return (
     <section aria-label="Chat workspace" style={styles.panel}>
       <div style={styles.header}>
@@ -14,7 +18,7 @@ export default function ChatPanel() {
         <RunProgress />
       </div>
       <MessageList messages={mockChatMessages} />
-      <MessageComposer />
+      <MessageComposer onReview={onReview} />
     </section>
   );
 }

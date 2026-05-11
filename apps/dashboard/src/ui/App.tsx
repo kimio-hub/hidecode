@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MOCK_EVENTS, MOCK_RUN } from '../data/mock';
+import { parseHidecodeAppState } from '../data/appMode';
 import {
   loadManifestFromUrl,
   loadRunFromUrl,
@@ -15,6 +16,8 @@ import BottomStatusBar from './components/BottomStatusBar';
 import LeftSidebar from './components/LeftSidebar';
 import RightInspector from './components/RightInspector';
 import HomePage from './modes/HomePage';
+import ChatWorkspace from './modes/ChatWorkspace';
+import ReviewWorkspace from './modes/ReviewWorkspace';
 
 type LoadState =
   | { status: 'ready'; events: TraceEvent[]; run: RunMeta; source: DashboardSource; sourceLabel: string }
@@ -23,6 +26,7 @@ type LoadState =
 
 export default function App() {
   const source = useMemo(() => parseDashboardSource(window.location.search), []);
+  const [appSearch, setAppSearch] = useState(window.location.search);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
     if (source.kind === 'mock') {
@@ -30,6 +34,12 @@ export default function App() {
     }
     return { status: 'loading', source, sourceLabel };
   });
+
+  useEffect(() => {
+    const syncSearch = () => setAppSearch(window.location.search);
+    window.addEventListener('popstate', syncSearch);
+    return () => window.removeEventListener('popstate', syncSearch);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,12 +104,22 @@ export default function App() {
   }
 
   const shellEvents = state.status === 'ready' ? state.events : MOCK_EVENTS;
+  const appState = parseHidecodeAppState(appSearch);
+  const navigateToReview = () => {
+    window.history.pushState(null, '', '?mode=review');
+    setAppSearch('?mode=review');
+  };
+  const workspace = appState.mode === 'review'
+    ? <ReviewWorkspace />
+    : appState.mode === 'chat'
+      ? <ChatWorkspace onReview={navigateToReview} />
+      : <HomePage />;
 
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>
       <AppShell
         sidebar={<LeftSidebar />}
-        workspace={<HomePage />}
+        workspace={workspace}
         inspector={<RightInspector events={shellEvents} />}
         status={<BottomStatusBar />}
       />

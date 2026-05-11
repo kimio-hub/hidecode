@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
 
 const originalLocation = window.location;
@@ -22,6 +22,26 @@ describe('App data loading', () => {
     expect(screen.getByText('GUI-first coding workspace')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Build with hidecode' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Run inspector' })).toBeInTheDocument();
+  });
+
+  it('renders review workspace when app mode is review', () => {
+    setSearch('?mode=review');
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Review proposed changes' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Command preview' })).toBeInTheDocument();
+  });
+
+  it('switches from chat mode to review mode when the Review action is clicked', () => {
+    setSearch('?mode=chat');
+
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+
+    expect(screen.getByRole('heading', { name: 'Review proposed changes' })).toBeInTheDocument();
   });
 
   it('loads a run directory from the run query parameter', async () => {

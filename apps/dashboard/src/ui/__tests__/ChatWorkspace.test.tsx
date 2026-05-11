@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import ChatWorkspace from '../modes/ChatWorkspace';
 
@@ -20,13 +20,12 @@ describe('ChatWorkspace', () => {
     expect(screen.getByText('failed')).toBeInTheDocument();
   });
 
-  it('renders composer quick actions', () => {
-    render(<ChatWorkspace />);
+  it('calls review mode callback from the Review quick action', () => {
+    let requestedMode = '';
+    render(<ChatWorkspace onReview={() => { requestedMode = 'review'; }} />);
 
-    expect(screen.getByRole('textbox', { name: 'Message hidecode' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+
+    expect(requestedMode).toBe('review');
   });
 });
