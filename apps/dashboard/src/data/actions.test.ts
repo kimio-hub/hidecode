@@ -8,6 +8,7 @@ import {
   actionReasonAttributes,
   DEFAULT_RUNTIME_ACTION_READINESS,
   normalizeRuntimeActionReadiness,
+  normalizeRuntimeActionResponse,
   runtimeActionPreview,
   runtimeActionReadinessIndicator,
   runtimeActionReadinessMessage,
@@ -336,6 +337,80 @@ describe('Dashboard runtime action intents', () => {
     expect(runtimeActionPreview(toRuntimeActionRequest(buildCommandActionIntent('ask-harness')))).toBe(
       'command.ask-harness → command',
     );
+  });
+
+  it('normalizes accepted runtime action backend responses', () => {
+    expect(normalizeRuntimeActionResponse({
+      status: 'accepted',
+      accepted: true,
+      commandId: 'command-1',
+      traceEventId: 'trace-1',
+      queuedOperationId: 'operation-1',
+      ignored: 'field',
+    })).toEqual({
+      status: 'accepted',
+      accepted: true,
+      commandId: 'command-1',
+      traceEventId: 'trace-1',
+      queuedOperationId: 'operation-1',
+    });
+  });
+
+  it('normalizes rejected and duplicate runtime action backend responses', () => {
+    expect(normalizeRuntimeActionResponse({
+      status: 'rejected',
+      accepted: false,
+      commandId: 'command-2',
+      traceEventId: 'trace-2',
+      reason: 'Rejected by policy check.',
+      queuedOperationId: 42,
+    })).toEqual({
+      status: 'rejected',
+      accepted: false,
+      commandId: 'command-2',
+      traceEventId: 'trace-2',
+      reason: 'Rejected by policy check.',
+    });
+
+    expect(normalizeRuntimeActionResponse({
+      status: 'duplicate',
+      accepted: false,
+      commandId: 'command-3',
+      traceEventId: 'trace-3',
+      reason: 'Duplicate commandId; original trace event returned.',
+    })).toEqual({
+      status: 'duplicate',
+      accepted: false,
+      commandId: 'command-3',
+      traceEventId: 'trace-3',
+      reason: 'Duplicate commandId; original trace event returned.',
+    });
+  });
+
+  it('rejects malformed runtime action backend response payloads safely', () => {
+    const malformedPayloads: unknown[] = [
+      undefined,
+      null,
+      'accepted',
+      42,
+      [],
+      { status: 'accepted', accepted: true, commandId: 'command-1' },
+      { status: 'pending', accepted: true, commandId: 'command-1', traceEventId: 'trace-1' },
+      { status: 'accepted', accepted: 'true', commandId: 'command-1', traceEventId: 'trace-1' },
+      { status: 'accepted', accepted: true, commandId: '', traceEventId: 'trace-1' },
+      { status: 'accepted', accepted: true, commandId: '   ', traceEventId: 'trace-1' },
+      { status: 'accepted', accepted: true, commandId: 'command-1', traceEventId: '' },
+      { status: 'accepted', accepted: true, commandId: 'command-1', traceEventId: '   ' },
+      { status: 'accepted', accepted: true, commandId: 1, traceEventId: 'trace-1' },
+      { status: 'accepted', accepted: true, commandId: 'command-1', traceEventId: 1 },
+      { status: 'accepted', accepted: false, commandId: 'command-1', traceEventId: 'trace-1' },
+      { status: 'rejected', accepted: true, commandId: 'command-1', traceEventId: 'trace-1' },
+      { status: 'duplicate', accepted: true, commandId: 'command-1', traceEventId: 'trace-1' },
+    ];
+
+    for (const payload of malformedPayloads) {
+      expect(normalizeRuntimeActionResponse(payload)).toBeUndefined();
+    }
   });
 
   it('models accepted runtime action responses and audit events without side effects', () => {

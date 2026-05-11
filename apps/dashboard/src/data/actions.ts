@@ -228,6 +228,26 @@ export function normalizeRuntimeActionReadiness(input?: Partial<DashboardRuntime
   return { ...normalized, canSubmitActions: false };
 }
 
+export function normalizeRuntimeActionResponse(input: unknown): RuntimeActionResponse | undefined {
+  if (!isRecord(input)) return undefined;
+
+  const { status, accepted, commandId, traceEventId, reason, queuedOperationId } = input;
+  if (!isRuntimeActionStatus(status)) return undefined;
+  if (typeof accepted !== 'boolean') return undefined;
+  if (accepted !== (status === 'accepted')) return undefined;
+  if (!isNonEmptyString(commandId)) return undefined;
+  if (!isNonEmptyString(traceEventId)) return undefined;
+
+  return {
+    status,
+    accepted,
+    commandId,
+    traceEventId,
+    ...(typeof reason === 'string' ? { reason } : {}),
+    ...(typeof queuedOperationId === 'string' ? { queuedOperationId } : {}),
+  };
+}
+
 export function toRuntimeActionRequest(intent: DashboardActionIntent, clientRequestId?: string): RuntimeActionRequest {
   return {
     domain: intent.domain,
@@ -261,6 +281,18 @@ function normalizeReplayActionTarget(target?: string | ReplayActionTargetByActio
   if (typeof target === 'string') return { kind: 'replay-step', id: target };
   if (target) return target;
   return { kind: 'run' };
+}
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === 'object' && input !== null && !Array.isArray(input);
+}
+
+function isRuntimeActionStatus(input: unknown): input is RuntimeActionStatus {
+  return input === 'accepted' || input === 'rejected' || input === 'duplicate';
+}
+
+function isNonEmptyString(input: unknown): input is string {
+  return typeof input === 'string' && input.trim().length > 0;
 }
 
 function disabledIntent(
