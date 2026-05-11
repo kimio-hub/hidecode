@@ -17,7 +17,8 @@ All current intents have:
 - `requiresBackend: true`
 - a visible label used by the UI button
 - a stable disabled reason exposed through button `title` text
-- optional `targetId` when an action targets an approval item, replay step/run, or agent card
+- explicit `target.kind` metadata so future backend requests can distinguish approvals, replay steps, runs, agents, and commands
+- optional `targetId` when an action targets a specific approval item, replay step/run, or agent card
 
 ## Future backend boundary
 

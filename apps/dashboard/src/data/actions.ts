@@ -7,16 +7,28 @@ export type CommandAction = 'ask-harness';
 
 export type DashboardAction = ApprovalAction | ReplayAction | AgentAction | CommandAction;
 
-export interface DashboardActionIntent {
+export type DashboardActionTargetKind = 'approval' | 'replay-step' | 'run' | 'agent' | 'command';
+
+export interface DashboardActionTarget {
+  kind: DashboardActionTargetKind;
+  id?: string;
+}
+
+interface BaseDashboardActionIntent {
   id: string;
-  domain: DashboardActionDomain;
-  action: DashboardAction;
   label: string;
   enabled: boolean;
   reason: string;
   requiresBackend: boolean;
   targetId?: string;
+  target?: DashboardActionTarget;
 }
+
+export type DashboardActionIntent =
+  | (BaseDashboardActionIntent & { domain: 'approval'; action: ApprovalAction; target: DashboardActionTarget & { kind: 'approval'; id: string }; targetId: string })
+  | (BaseDashboardActionIntent & { domain: 'replay'; action: ReplayAction; target?: DashboardActionTarget & { kind: 'replay-step' | 'run' } })
+  | (BaseDashboardActionIntent & { domain: 'agent'; action: AgentAction; target: DashboardActionTarget & { kind: 'agent'; id: string }; targetId: string })
+  | (BaseDashboardActionIntent & { domain: 'command'; action: CommandAction; target: DashboardActionTarget & { kind: 'command' } });
 
 export interface DashboardActionReasonAttributes {
   title: string;
@@ -48,19 +60,20 @@ const commandLabels: Record<CommandAction, string> = {
 };
 
 export function buildApprovalActionIntent(action: ApprovalAction, targetId: string): DashboardActionIntent {
-  return disabledIntent('approval', action, approvalLabels[action], BACKEND_REASON, targetId);
+  return disabledIntent('approval', action, approvalLabels[action], BACKEND_REASON, { kind: 'approval', id: targetId });
 }
 
-export function buildReplayActionIntent(action: ReplayAction, targetId?: string): DashboardActionIntent {
-  return disabledIntent('replay', action, replayLabels[action], BACKEND_REASON, targetId);
+export function buildReplayActionIntent(action: ReplayAction, target?: string | (DashboardActionTarget & { kind: 'replay-step' | 'run' })): DashboardActionIntent {
+  const normalizedTarget = typeof target === 'string' ? { kind: 'replay-step' as const, id: target } : target;
+  return disabledIntent('replay', action, replayLabels[action], BACKEND_REASON, normalizedTarget);
 }
 
 export function buildAgentActionIntent(action: AgentAction, targetId: string): DashboardActionIntent {
-  return disabledIntent('agent', action, agentLabels[action], BACKEND_REASON, targetId);
+  return disabledIntent('agent', action, agentLabels[action], BACKEND_REASON, { kind: 'agent', id: targetId });
 }
 
 export function buildCommandActionIntent(action: CommandAction): DashboardActionIntent {
-  return disabledIntent('command', action, commandLabels[action], COMMAND_REASON);
+  return disabledIntent('command', action, commandLabels[action], COMMAND_REASON, { kind: 'command' });
 }
 
 export function actionReasonAttributes(intent: Pick<DashboardActionIntent, 'reason'>): DashboardActionReasonAttributes {
@@ -75,10 +88,11 @@ function disabledIntent(
   action: DashboardAction,
   label: string,
   reason: string,
-  targetId?: string,
+  target?: DashboardActionTarget,
 ): DashboardActionIntent {
+  const targetId = target?.id;
   return {
-    id: targetId ? `${domain}.${action}:${targetId}` : `${domain}.${action}`,
+    id: targetId ? `${domain}.${action}:${targetId}` : target ? `${domain}.${action}:${target.kind}` : `${domain}.${action}`,
     domain,
     action,
     label,
@@ -86,5 +100,6 @@ function disabledIntent(
     reason,
     requiresBackend: true,
     ...(targetId ? { targetId } : {}),
-  };
+    ...(target ? { target } : {}),
+  } as DashboardActionIntent;
 }

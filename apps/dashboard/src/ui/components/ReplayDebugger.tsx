@@ -17,9 +17,9 @@ const categoryTone: Record<ReplayStep['category'], string> = {
 };
 
 export default function ReplayDebugger({ steps }: Props) {
-  const replayIntent = buildReplayActionIntent('replay', steps[0]?.id);
-  const forkIntent = buildReplayActionIntent('fork', steps[0]?.id);
-  const saveEvalIntent = buildReplayActionIntent('save-eval');
+  const replayIntent = buildReplayActionIntent('replay', steps[0] ? { kind: 'replay-step', id: steps[0].id } : { kind: 'run' });
+  const forkIntent = buildReplayActionIntent('fork', { kind: 'run' });
+  const saveEvalIntent = buildReplayActionIntent('save-eval', { kind: 'run' });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

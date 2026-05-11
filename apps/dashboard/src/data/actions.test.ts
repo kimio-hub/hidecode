@@ -18,36 +18,48 @@ function expectDisabledBackendIntent(intent: DashboardActionIntent, expected: Pa
 }
 
 describe('Dashboard runtime action intents', () => {
-  it('models approval approve/reject actions as disabled backend intents with target ids', () => {
+  it('models approval approve/reject actions as disabled backend intents with target ids and target metadata', () => {
     expectDisabledBackendIntent(buildApprovalActionIntent('approve', 'approval-1'), {
+      id: 'approval.approve:approval-1',
       domain: 'approval',
       action: 'approve',
+      label: 'Approve',
       targetId: 'approval-1',
+      target: { kind: 'approval', id: 'approval-1' },
     });
 
     expectDisabledBackendIntent(buildApprovalActionIntent('reject', 'approval-2'), {
+      id: 'approval.reject:approval-2',
       domain: 'approval',
       action: 'reject',
+      label: 'Reject',
       targetId: 'approval-2',
+      target: { kind: 'approval', id: 'approval-2' },
     });
   });
 
-  it('models replay actions as disabled until replay/fork/save-eval backend support exists', () => {
-    expectDisabledBackendIntent(buildReplayActionIntent('replay', 'step-1'), {
+  it('models replay actions as disabled until replay/fork/save-eval backend support exists with explicit target kinds', () => {
+    expectDisabledBackendIntent(buildReplayActionIntent('replay', { kind: 'replay-step', id: 'step-1' }), {
+      id: 'replay.replay:step-1',
       domain: 'replay',
       action: 'replay',
       targetId: 'step-1',
+      target: { kind: 'replay-step', id: 'step-1' },
     });
 
-    expectDisabledBackendIntent(buildReplayActionIntent('fork', 'run-1'), {
+    expectDisabledBackendIntent(buildReplayActionIntent('fork', { kind: 'run', id: 'run-1' }), {
+      id: 'replay.fork:run-1',
       domain: 'replay',
       action: 'fork',
       targetId: 'run-1',
+      target: { kind: 'run', id: 'run-1' },
     });
 
-    expectDisabledBackendIntent(buildReplayActionIntent('save-eval'), {
+    expectDisabledBackendIntent(buildReplayActionIntent('save-eval', { kind: 'run' }), {
+      id: 'replay.save-eval:run',
       domain: 'replay',
       action: 'save-eval',
+      target: { kind: 'run' },
     });
   });
 
