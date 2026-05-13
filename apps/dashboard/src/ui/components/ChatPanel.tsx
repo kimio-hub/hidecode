@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { mockChatMessages, type ChatMessage } from '../../data/chat';
 import type { TraceEvent } from '../../data/loader';
 import {
@@ -19,13 +19,23 @@ interface ChatPanelProps {
   onEventsChange?: (events: TraceEvent[]) => void;
   onSessionChange?: (session: BackendSession) => void;
   projectPath?: string;
+  initialMessages?: ChatMessage[];
+  initialSession?: BackendSession | null;
 }
 
-export default function ChatPanel({ onReview, onEventsChange, onSessionChange, projectPath = '' }: ChatPanelProps) {
-  const [session, setSession] = useState<BackendSession | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
+export default function ChatPanel({ onReview, onEventsChange, onSessionChange, projectPath = '', initialMessages, initialSession }: ChatPanelProps) {
+  const [session, setSession] = useState<BackendSession | null>(initialSession ?? null);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages?.length ? initialMessages : mockChatMessages);
   const [status, setStatus] = useState('Ready');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (initialMessages) setMessages(initialMessages.length ? initialMessages : mockChatMessages);
+  }, [initialMessages]);
+
+  useEffect(() => {
+    setSession(initialSession ?? null);
+  }, [initialSession]);
 
   async function handleSubmitMessage(content: string) {
     setIsSubmitting(true);

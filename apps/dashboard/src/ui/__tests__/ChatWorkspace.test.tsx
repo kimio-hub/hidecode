@@ -162,6 +162,49 @@ describe('ChatWorkspace', () => {
     expect(within(runProgress).getByText('Failed to post message: 500')).toBeInTheDocument();
   });
 
+  it('continues a loaded backend session instead of creating a new one', async () => {
+    const onSessionChange = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/sessions/sess-loaded/messages') {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            message: { id: 'msg-followup', role: 'user', content: 'Follow up', createdAt },
+            session: {
+              id: 'sess-loaded',
+              title: 'Loaded session',
+              projectPath: '/repo',
+              messages: [
+                { id: 'msg-existing', role: 'assistant', content: 'Existing answer', createdAt },
+                { id: 'msg-followup', role: 'user', content: 'Follow up', createdAt },
+              ],
+              events: [],
+            },
+          }),
+        } as Response;
+      }
+
+      return { ok: false, status: 418, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ChatWorkspace
+      initialMessages={[{ id: 'msg-existing', role: 'assistant', content: 'Existing answer', createdAt }]}
+      initialSession={{ id: 'sess-loaded', title: 'Loaded session', projectPath: '/repo', messages: [], events: [] }}
+      onSessionChange={onSessionChange}
+    />);
+
+    expect(screen.getByText('Existing answer')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Follow up' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-loaded/messages', expect.objectContaining({ method: 'POST' })));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/sessions', expect.objectContaining({ method: 'POST' }));
+    await waitFor(() => expect(screen.getByText('Follow up')).toBeInTheDocument());
+    expect(onSessionChange).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'sess-loaded' }));
+  });
+
   it('creates a backend session, submits a message, and publishes inspector events', async () => {
     const onEventsChange = vi.fn();
     const onSessionChange = vi.fn();

@@ -5,9 +5,10 @@ interface LeftSidebarProps {
   selectedProject?: RecentProject | null;
   currentSession?: BackendSession | null;
   sessionSummaries?: BackendSessionSummary[];
+  onLoadSession?: (sessionId: string) => void;
 }
 
-export default function LeftSidebar({ selectedProject, currentSession, sessionSummaries = [] }: LeftSidebarProps) {
+export default function LeftSidebar({ selectedProject, currentSession, sessionSummaries = [], onLoadSession }: LeftSidebarProps) {
   const latestRun = currentSession?.runs?.at(-1);
 
   return (
@@ -48,12 +49,17 @@ export default function LeftSidebar({ selectedProject, currentSession, sessionSu
         {sessionSummaries.length > 0 ? (
           <div style={styles.sessionList}>
             {sessionSummaries.map((session) => (
-              <article key={session.id} style={styles.sessionCard}>
+              <button
+                key={session.id}
+                onClick={() => onLoadSession?.(session.id)}
+                style={styles.sessionButton}
+                type="button"
+              >
                 <div style={styles.sessionTitle}>{session.title}</div>
                 <div style={styles.sessionMeta}>{session.id}</div>
                 <div style={styles.sessionMeta}>{formatMessageCount(session.messageCount)}</div>
                 <div style={styles.sessionMeta}>{formatEventCount(session.eventCount)}</div>
-              </article>
+              </button>
             ))}
           </div>
         ) : (
@@ -118,6 +124,18 @@ const styles = {
     fontSize: '12px',
     display: 'grid',
     gap: '6px',
+  },
+  sessionButton: {
+    border: '1px solid #24304a',
+    borderRadius: '12px',
+    padding: '12px',
+    color: '#d8dcef',
+    background: '#0d1424',
+    fontSize: '12px',
+    display: 'grid',
+    gap: '6px',
+    textAlign: 'left',
+    cursor: 'pointer',
   },
   sessionList: {
     display: 'grid',

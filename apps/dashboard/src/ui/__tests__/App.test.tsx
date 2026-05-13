@@ -361,6 +361,66 @@ describe('App data loading', () => {
     expect(screen.getByText('9 events')).toBeInTheDocument();
   });
 
+  it('loads a backend recent session into Chat and the Inspector when clicked', async () => {
+    setSearch('?api=http://127.0.0.1:8787');
+    const createdAt = '2026-05-12T09:00:00.000Z';
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === 'http://127.0.0.1:8787/api/sessions') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            sessions: [{
+              id: 'sess-loaded',
+              title: 'Loaded backend chat',
+              projectPath: '/tmp/app',
+              createdAt,
+              updatedAt: createdAt,
+              messageCount: 2,
+              eventCount: 1,
+            }],
+          }),
+        } as Response;
+      }
+
+      if (url === 'http://127.0.0.1:8787/api/sessions/sess-loaded') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            session: {
+              id: 'sess-loaded',
+              title: 'Loaded backend chat',
+              projectPath: '/tmp/app',
+              messages: [
+                { id: 'msg-user', role: 'user', content: 'Please inspect this bug', createdAt },
+                { id: 'msg-assistant', role: 'assistant', content: 'I found one tool event', createdAt },
+              ],
+              events: [
+                { id: 'evt-tool', sessionId: 'sess-loaded', type: 'tool.requested', createdAt, data: { tool: 'test', actor: 'agent' } },
+              ],
+            },
+          }),
+        } as Response;
+      }
+
+      return { ok: false, status: 418, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Loaded backend chat.*sess-loaded/s })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /Loaded backend chat.*sess-loaded/s }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getByText('Please inspect this bug')).toBeInTheDocument();
+    expect(screen.getByText('I found one tool event')).toBeInTheDocument();
+    expect(screen.getAllByText('sess-loaded').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('1 tool call')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions/sess-loaded', expect.objectContaining({ method: 'GET' }));
+  });
+
   it('loads a run directory from the run query parameter', async () => {
     setSearch('?run=/runs/demo');
     const traceLine = JSON.stringify({

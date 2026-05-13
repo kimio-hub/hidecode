@@ -18,7 +18,7 @@ import RightInspector from './components/RightInspector';
 import HomePage from './modes/HomePage';
 import ChatWorkspace from './modes/ChatWorkspace';
 import ReviewWorkspace from './modes/ReviewWorkspace';
-import { getBackendBaseUrl, listBackendSessions, type BackendSession, type BackendSessionSummary } from '../data/backend';
+import { getBackendBaseUrl, listBackendSessions, loadBackendSession, sessionEventsToTraceEvents, sessionMessagesToChatMessages, type BackendSession, type BackendSessionSummary } from '../data/backend';
 import { recentProjects, type RecentProject } from '../data/projects';
 import { backendProjectToRecentProject, listBackendProjects, openBackendProject } from '../data/projects-backend';
 
@@ -35,6 +35,7 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState<RecentProject | null>(null);
   const [homeProjects, setHomeProjects] = useState<RecentProject[]>(recentProjects);
   const [sessionSummaries, setSessionSummaries] = useState<BackendSessionSummary[]>([]);
+  const [chatInitialMessages, setChatInitialMessages] = useState(() => sessionMessagesToChatMessages([]));
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
@@ -179,16 +180,38 @@ export default function App() {
       setProjectStatus(error instanceof Error ? error.message : String(error));
     }
   };
+  const loadRecentSession = async (sessionId: string) => {
+    setProjectStatus(`Loading session ${sessionId}…`);
+    try {
+      const session = await loadBackendSession(sessionId, getBackendBaseUrl());
+      setChatSession(session);
+      setChatEvents(sessionEventsToTraceEvents(session.events));
+      setChatInitialMessages(sessionMessagesToChatMessages(session.messages));
+      setSelectedProject({
+        id: session.projectPath || session.id,
+        name: session.projectPath ? session.projectPath.split(/[\\/]/).filter(Boolean).at(-1) ?? session.title : session.title,
+        path: session.projectPath,
+        description: 'Loaded backend session',
+        lastOpened: 'Loaded session',
+      });
+      setProjectStatus(null);
+      const nextSearch = withAppMode(appSearch, 'chat');
+      window.history.pushState(null, '', nextSearch);
+      setAppSearch(nextSearch);
+    } catch (error) {
+      setProjectStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
   const workspace = appState.mode === 'review'
     ? <ReviewWorkspace session={chatSession} />
     : appState.mode === 'chat'
-      ? <ChatWorkspace onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} projectPath={selectedProject?.path} />
+      ? <ChatWorkspace initialMessages={chatInitialMessages} initialSession={chatSession} onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} projectPath={selectedProject?.path} />
       : <HomePage onOpenProject={openProject} projects={homeProjects} />;
 
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>
       <AppShell
-        sidebar={<LeftSidebar currentSession={chatSession} selectedProject={selectedProject} sessionSummaries={sessionSummaries} />}
+        sidebar={<LeftSidebar currentSession={chatSession} selectedProject={selectedProject} sessionSummaries={sessionSummaries} onLoadSession={loadRecentSession} />}
         workspace={workspace}
         inspector={<RightInspector events={shellEvents} />}
         status={<BottomStatusBar selectedProject={selectedProject} projectStatus={projectStatus} />}

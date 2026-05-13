@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   listBackendSessions,
+  loadBackendSession,
   sessionEventsToTraceEvents,
   sessionMessagesToChatMessages,
   type BackendSession,
@@ -92,5 +93,30 @@ describe('dashboard backend adapters', () => {
       },
     ]);
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions', expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('loads a full backend session by id', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        session: {
+          id: 'sess/1',
+          title: 'Fix tests',
+          projectPath: '/repo',
+          messages: [{ id: 'msg-1', role: 'user', content: 'Fix tests', createdAt }],
+          events: [{ id: 'evt-1', sessionId: 'sess/1', type: 'tool.requested', createdAt, data: { tool: 'test' } }],
+        },
+      }),
+    } as Response));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(loadBackendSession('sess/1', 'http://127.0.0.1:8787')).resolves.toMatchObject({
+      id: 'sess/1',
+      title: 'Fix tests',
+      messages: [expect.objectContaining({ content: 'Fix tests' })],
+      events: [expect.objectContaining({ type: 'tool.requested' })],
+    });
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions/sess%2F1', expect.objectContaining({ method: 'GET' }));
   });
 });

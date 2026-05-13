@@ -80,6 +80,10 @@ export interface BackendCreateSessionResponse {
   session: BackendSession;
 }
 
+export interface BackendGetSessionResponse {
+  session: BackendSession;
+}
+
 export interface BackendCreateMessageResponse {
   message: BackendSessionMessage;
   session: BackendSession;
@@ -117,6 +121,13 @@ export async function listBackendSessions(baseUrl = ''): Promise<BackendSessionS
   if (!response.ok) throw new Error(`Failed to list sessions: ${response.status}`);
   const body = await response.json() as BackendListSessionsResponse;
   return body.sessions;
+}
+
+export async function loadBackendSession(sessionId: string, baseUrl = ''): Promise<BackendSession> {
+  const response = await fetch(`${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'GET' });
+  if (!response.ok) throw new Error(`Failed to load session: ${response.status}`);
+  const body = await response.json() as BackendGetSessionResponse;
+  return body.session;
 }
 
 export async function createBackendSession(projectPath = '', baseUrl = ''): Promise<BackendSession> {

@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import type { BackendSessionSummary } from '../../data/backend';
 import type { RecentProject } from '../../data/projects';
 import LeftSidebar from '../components/LeftSidebar';
@@ -38,10 +38,19 @@ describe('LeftSidebar', () => {
     render(<LeftSidebar selectedProject={selectedProject} sessionSummaries={sessionSummaries} />);
 
     expect(screen.getByText('Recent sessions')).toBeInTheDocument();
-    expect(screen.getByText('Fix tests')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Fix tests.*sess-new/s })).toBeInTheDocument();
     expect(screen.getByText('sess-new')).toBeInTheDocument();
     expect(screen.getByText('2 messages')).toBeInTheDocument();
     expect(screen.getByText('8 events')).toBeInTheDocument();
-    expect(screen.getByText('Explain codebase')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Explain codebase.*sess-old/s })).toBeInTheDocument();
+  });
+
+  it('requests loading a recent session when its card is clicked', () => {
+    const onLoadSession = vi.fn();
+    render(<LeftSidebar selectedProject={selectedProject} sessionSummaries={sessionSummaries} onLoadSession={onLoadSession} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Fix tests.*sess-new/s }));
+
+    expect(onLoadSession).toHaveBeenCalledWith('sess-new');
   });
 });
