@@ -20,8 +20,8 @@ import ChatWorkspace from './modes/ChatWorkspace';
 import ReviewWorkspace from './modes/ReviewWorkspace';
 import type { BackendSession } from '../data/backend';
 import { getBackendBaseUrl } from '../data/backend';
-import type { RecentProject } from '../data/projects';
-import { openBackendProject } from '../data/projects-backend';
+import { recentProjects, type RecentProject } from '../data/projects';
+import { backendProjectToRecentProject, listBackendProjects, openBackendProject } from '../data/projects-backend';
 
 type LoadState =
   | { status: 'ready'; events: TraceEvent[]; run: RunMeta; source: DashboardSource; sourceLabel: string }
@@ -34,6 +34,7 @@ export default function App() {
   const [chatEvents, setChatEvents] = useState<TraceEvent[]>([]);
   const [chatSession, setChatSession] = useState<BackendSession | null>(null);
   const [selectedProject, setSelectedProject] = useState<RecentProject | null>(null);
+  const [homeProjects, setHomeProjects] = useState<RecentProject[]>(recentProjects);
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
@@ -94,6 +95,26 @@ export default function App() {
     };
   }, [source]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProjects() {
+      if (source.kind !== 'mock' || appSearch.includes('mode=')) return;
+      try {
+        const projects = await listBackendProjects(getBackendBaseUrl());
+        if (!cancelled && projects.length > 0) {
+          setHomeProjects(projects.map(backendProjectToRecentProject));
+        }
+      } catch {
+        if (!cancelled) setHomeProjects(recentProjects);
+      }
+    }
+
+    void loadProjects();
+    return () => {
+      cancelled = true;
+    };
+  }, [source.kind, appSearch]);
+
   if (state.status === 'loading') {
     return <CenteredState title="Loading run trace…" detail={state.sourceLabel} />;
   }
@@ -116,8 +137,9 @@ export default function App() {
     ? chatEvents
     : state.status === 'ready' ? state.events : MOCK_EVENTS;
   const navigateToReview = () => {
-    window.history.pushState(null, '', '?mode=review');
-    setAppSearch('?mode=review');
+    const nextSearch = withAppMode(appSearch, 'review');
+    window.history.pushState(null, '', nextSearch);
+    setAppSearch(nextSearch);
   };
   const openProject = async (project: RecentProject) => {
     setSelectedProject(null);
@@ -132,8 +154,9 @@ export default function App() {
         lastOpened: 'Just now',
       });
       setProjectStatus(null);
-      window.history.pushState(null, '', '?mode=chat');
-      setAppSearch('?mode=chat');
+      const nextSearch = withAppMode(appSearch, 'chat');
+      window.history.pushState(null, '', nextSearch);
+      setAppSearch(nextSearch);
     } catch (error) {
       setProjectStatus(error instanceof Error ? error.message : String(error));
     }
@@ -142,7 +165,7 @@ export default function App() {
     ? <ReviewWorkspace session={chatSession} />
     : appState.mode === 'chat'
       ? <ChatWorkspace onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} projectPath={selectedProject?.path} />
-      : <HomePage onOpenProject={openProject} />;
+      : <HomePage onOpenProject={openProject} projects={homeProjects} />;
 
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>
@@ -154,6 +177,12 @@ export default function App() {
       />
     </div>
   );
+}
+
+function withAppMode(search: string, mode: string): string {
+  const params = new URLSearchParams(search);
+  params.set('mode', mode);
+  return `?${params.toString()}`;
 }
 
 function CenteredState({ title, detail }: { title: string; detail: string }) {

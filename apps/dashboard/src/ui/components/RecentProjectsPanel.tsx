@@ -2,14 +2,15 @@ import { recentProjects, type RecentProject } from '../../data/projects';
 
 interface RecentProjectsPanelProps {
   onOpenProject?: (project: RecentProject) => void;
+  projects?: RecentProject[];
 }
 
-export default function RecentProjectsPanel({ onOpenProject }: RecentProjectsPanelProps) {
+export default function RecentProjectsPanel({ onOpenProject, projects = recentProjects }: RecentProjectsPanelProps) {
   return (
     <section aria-label="Recent projects" style={styles.panel}>
       <div style={styles.heading}>Recent Projects</div>
       <div style={styles.list}>
-        {recentProjects.map((project) => (
+        {projects.map((project) => (
           <button
             key={project.id}
             type="button"

@@ -174,6 +174,94 @@ describe('App data loading', () => {
     expect(screen.queryByRole('heading', { name: 'Chat with your coding agent' })).not.toBeInTheDocument();
   });
 
+  it('loads backend recent projects on Home and opens the selected backend project', async () => {
+    setSearch('?api=http://127.0.0.1:8787');
+    const createdAt = '2026-05-12T10:00:00.000Z';
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === 'http://127.0.0.1:8787/api/projects') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ projects: [{ id: 'custom', name: 'custom-app', path: '/tmp/custom-app', openedAt: createdAt }] }),
+        } as Response;
+      }
+
+      if (url === 'http://127.0.0.1:8787/api/projects/open') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ name: 'custom-app', path: '/tmp/custom-app' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ project: { id: 'custom', name: 'custom-app', path: '/tmp/custom-app', openedAt: createdAt } }),
+        } as Response;
+      }
+
+      if (url === 'http://127.0.0.1:8787/api/sessions') {
+        expect(JSON.parse(init?.body as string)).toMatchObject({ projectPath: '/tmp/custom-app' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ session: { id: 'sess-custom', title: 'hidecode session', projectPath: '/tmp/custom-app', messages: [], events: [] } }),
+        } as Response;
+      }
+
+      if (url === 'http://127.0.0.1:8787/api/sessions/sess-custom/messages') {
+        expect(init?.method).toBe('POST');
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            message: { id: 'msg-custom', role: 'user', content: 'Explain this project', createdAt },
+            run: { ok: true, summary: 'custom project run complete', tracePath: '/tmp/custom-app/.runs/run-1/trace.jsonl', reportPath: '/tmp/custom-app/.runs/run-1/report.md', steps: 1, durationMs: 5 },
+            session: {
+              id: 'sess-custom',
+              title: 'hidecode session',
+              projectPath: '/tmp/custom-app',
+              messages: [{ id: 'msg-custom', role: 'user', content: 'Explain this project', createdAt }],
+              events: [],
+            },
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: false,
+        status: 418,
+        json: async () => ({ error: `unexpected_url:${url}` }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /custom-app.*\/tmp\/custom-app/s })).toBeInTheDocument());
+    expect(screen.queryByText('ljquant')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /custom-app.*\/tmp\/custom-app/s }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Explain this project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(screen.getByText('custom project run complete')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/projects', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions', expect.any(Object));
+  });
+
+  it('falls back to mock recent projects when backend project listing fails', async () => {
+    setSearch('?api=http://127.0.0.1:8787');
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    } as Response)));
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText('hidecode').length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByText('ljquant')).toBeInTheDocument();
+  });
+
   it('loads a run directory from the run query parameter', async () => {
     setSearch('?run=/runs/demo');
     const traceLine = JSON.stringify({

@@ -5,9 +5,10 @@ import type { RecentProject } from '../../data/projects';
 
 interface HomePageProps {
   onOpenProject?: (project: RecentProject) => void;
+  projects?: RecentProject[];
 }
 
-export default function HomePage({ onOpenProject }: HomePageProps) {
+export default function HomePage({ onOpenProject, projects }: HomePageProps) {
   return (
     <div style={styles.page}>
       <div style={styles.hero}>
@@ -23,7 +24,7 @@ export default function HomePage({ onOpenProject }: HomePageProps) {
         <div style={styles.dropZone}>Drag a project folder here</div>
       </div>
       <div style={styles.grid}>
-        <RecentProjectsPanel onOpenProject={onOpenProject} />
+        <RecentProjectsPanel onOpenProject={onOpenProject} projects={projects} />
         <div style={styles.sideStack}>
           <QuickStartPanel />
           <ModelSafetySetup />
