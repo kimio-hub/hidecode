@@ -158,6 +158,68 @@ describe('App data loading', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
   });
 
+  it('opens a manually entered project and creates chat sessions with that project path', async () => {
+    setSearch('');
+    const createdAt = '2026-05-12T11:00:00.000Z';
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/projects/open') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ name: 'Manual App', path: '/tmp/manual-app' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ project: { id: 'manual-app', name: 'Manual App', path: '/tmp/manual-app', openedAt: createdAt } }),
+        } as Response;
+      }
+
+      if (url === '/api/sessions') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ projectPath: '/tmp/manual-app', title: 'hidecode session' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-manual', title: 'hidecode session', projectPath: '/tmp/manual-app', messages: [], events: [] },
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({
+          message: { id: 'msg-manual', role: 'user', content: 'Explain this manual project', createdAt },
+          run: { ok: true, summary: 'manual project run complete', tracePath: '/tmp/manual-app/.runs/run-1/trace.jsonl', reportPath: '/tmp/manual-app/.runs/run-1/report.md', steps: 1, durationMs: 5 },
+          session: {
+            id: 'sess-manual',
+            title: 'hidecode session',
+            projectPath: '/tmp/manual-app',
+            messages: [{ id: 'msg-manual', role: 'user', content: 'Explain this manual project', createdAt }],
+            events: [],
+          },
+        }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Folder' }));
+    fireEvent.change(screen.getByLabelText('Project path'), { target: { value: '/tmp/manual-app' } });
+    fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Manual App' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getAllByText('Manual App').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/project: \/tmp\/manual-app/).length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Explain this manual project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(screen.getByText('manual project run complete')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith('/api/projects/open', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
+  });
+
   it('keeps the user on Home when opening a project fails', async () => {
     setSearch('');
     vi.stubGlobal('fetch', vi.fn(async () => ({
