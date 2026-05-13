@@ -65,6 +65,7 @@ describe('HomePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Preview Clone' }));
 
+    expect(screen.getByText('Clone preview staged — backend approval is required before any network or filesystem action.')).toBeInTheDocument();
     expect(onOpenProject).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();

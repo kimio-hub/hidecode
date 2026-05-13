@@ -3,12 +3,15 @@ import { useState, type CSSProperties, type FormEvent } from 'react';
 export default function CloneRepositoryPreview() {
   const [repositoryUrl, setRepositoryUrl] = useState('');
   const [destinationPath, setDestinationPath] = useState('');
+  const [previewStatus, setPreviewStatus] = useState('');
   const normalizedRepositoryUrl = repositoryUrl.trim();
   const normalizedDestinationPath = normalizePath(destinationPath);
   const canPreviewClone = Boolean(normalizedRepositoryUrl && normalizedDestinationPath);
 
   const previewCloneRepository = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canPreviewClone) return;
+    setPreviewStatus('Clone preview staged — backend approval is required before any network or filesystem action.');
   };
 
   return (
@@ -38,6 +41,7 @@ export default function CloneRepositoryPreview() {
           <span>Preview only — cloning requires explicit backend approval.</span>
         </div>
       ) : null}
+      {previewStatus ? <div aria-live="polite" style={styles.previewStatus}>{previewStatus}</div> : null}
     </form>
   );
 }
@@ -99,5 +103,11 @@ const styles = {
     gap: '6px',
     color: '#a4aec3',
     fontSize: '12px',
+  },
+  previewStatus: {
+    gridColumn: '1 / -1',
+    color: '#93c5fd',
+    fontSize: '12px',
+    fontWeight: 700,
   },
 } satisfies Record<string, CSSProperties>;
