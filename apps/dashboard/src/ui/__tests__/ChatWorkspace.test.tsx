@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatWorkspace from '../modes/ChatWorkspace';
@@ -203,6 +204,200 @@ describe('ChatWorkspace', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/sessions', expect.objectContaining({ method: 'POST' }));
     await waitFor(() => expect(screen.getByText('Follow up')).toBeInTheDocument());
     expect(onSessionChange).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'sess-loaded' }));
+  });
+
+  it('subscribes to active session event snapshots while a message is running', async () => {
+    let resolveMessage: (response: Response) => void = () => {};
+    const messageResponse = new Promise<Response>((resolve) => { resolveMessage = resolve; });
+    const onEventsChange = vi.fn();
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/sessions') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-live', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+          }),
+        } as Response);
+      }
+
+      if (url === '/api/sessions/sess-live/events') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            events: [{
+              id: 'evt-live-tool',
+              sessionId: 'sess-live',
+              type: 'tool.requested',
+              createdAt,
+              data: { runId: 'run-live', taskId: 'task-live', actor: 'orchestrator', tool: 'test' },
+            }],
+          }),
+        } as Response);
+      }
+
+      if (url === '/api/sessions/sess-live/messages') return messageResponse;
+
+      return Promise.resolve({ ok: false, status: 418, json: async () => ({}) } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ChatWorkspace onEventsChange={onEventsChange} />);
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix live updates' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-live/messages', expect.objectContaining({ method: 'POST' })));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-live/events', expect.objectContaining({ method: 'GET' })));
+    expect(onEventsChange).toHaveBeenCalledWith([
+      expect.objectContaining({ eventId: 'evt-live-tool', runId: 'run-live', taskId: 'task-live', type: 'tool.requested' }),
+    ]);
+
+    resolveMessage({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        message: { id: 'msg-live', role: 'user', content: 'Fix live updates', createdAt },
+        run: { ok: true, summary: 'live run complete', tracePath: '/repo/.runs/run-live/trace.jsonl', reportPath: '/repo/.runs/run-live/report.md', steps: 1, durationMs: 5 },
+        session: {
+          id: 'sess-live',
+          title: 'hidecode session',
+          projectPath: '/repo',
+          messages: [{ id: 'msg-live', role: 'user', content: 'Fix live updates', createdAt }],
+          events: [],
+        },
+      }),
+    } as Response);
+    await waitFor(() => expect(screen.getAllByText('live run complete').length).toBeGreaterThan(0));
+  });
+
+  it('stops live event polling when the chat workspace unmounts mid-run', async () => {
+    let resolveMessage: (response: Response) => void = () => {};
+    const messageResponse = new Promise<Response>((resolve) => { resolveMessage = resolve; });
+    const onEventsChange = vi.fn();
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/sessions') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-cleanup', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+          }),
+        } as Response);
+      }
+
+      if (url === '/api/sessions/sess-cleanup/events') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ events: [] }) } as Response);
+      }
+
+      if (url === '/api/sessions/sess-cleanup/messages') return messageResponse;
+
+      return Promise.resolve({ ok: false, status: 418, json: async () => ({}) } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = render(<ChatWorkspace onEventsChange={onEventsChange} />);
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix cleanup' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-cleanup/events', expect.objectContaining({ method: 'GET' })));
+    const callsBeforeUnmount = fetchMock.mock.calls.length;
+
+    unmount();
+    await new Promise((resolve) => window.setTimeout(resolve, 1100));
+
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeUnmount);
+    resolveMessage({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        message: { id: 'msg-cleanup', role: 'user', content: 'Fix cleanup', createdAt },
+        session: { id: 'sess-cleanup', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+      }),
+    } as Response);
+  });
+
+  it('does not start live event polling after unmounting during session creation', async () => {
+    let resolveSession: (response: Response) => void = () => {};
+    const sessionResponse = new Promise<Response>((resolve) => { resolveSession = resolve; });
+    const onEventsChange = vi.fn();
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/sessions') return sessionResponse;
+      if (url === '/api/sessions/sess-after-unmount/events') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ events: [] }) } as Response);
+      }
+      if (url === '/api/sessions/sess-after-unmount/messages') {
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ session: { id: 'sess-after-unmount', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] } }) } as Response);
+      }
+      return Promise.resolve({ ok: false, status: 418, json: async () => ({}) } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = render(<ChatWorkspace onEventsChange={onEventsChange} />);
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix cleanup' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.objectContaining({ method: 'POST' })));
+
+    unmount();
+    resolveSession({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        session: { id: 'sess-after-unmount', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+      }),
+    } as Response);
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/sessions/sess-after-unmount/events', expect.anything());
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/sessions/sess-after-unmount/messages', expect.anything());
+    expect(onEventsChange).not.toHaveBeenCalled();
+  });
+
+  it('submits backend messages when rendered in React StrictMode', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/sessions') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-strict', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+          }),
+        } as Response);
+      }
+
+      if (url === '/api/sessions/sess-strict/events') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ events: [] }) } as Response);
+      }
+
+      if (url === '/api/sessions/sess-strict/messages') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            message: { id: 'msg-strict', role: 'user', content: 'Fix strict mode', createdAt },
+            run: { ok: true, summary: 'strict run complete', tracePath: '/repo/.runs/run-strict/trace.jsonl', reportPath: '/repo/.runs/run-strict/report.md', steps: 1, durationMs: 5 },
+            session: {
+              id: 'sess-strict',
+              title: 'hidecode session',
+              projectPath: '/repo',
+              messages: [{ id: 'msg-strict', role: 'user', content: 'Fix strict mode', createdAt }],
+              events: [],
+            },
+          }),
+        } as Response);
+      }
+
+      return Promise.resolve({ ok: false, status: 418, json: async () => ({}) } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<StrictMode><ChatWorkspace /></StrictMode>);
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix strict mode' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-strict/messages', expect.objectContaining({ method: 'POST' })));
+    await waitFor(() => expect(screen.getAllByText('strict run complete').length).toBeGreaterThan(0));
   });
 
   it('creates a backend session, submits a message, and publishes inspector events', async () => {

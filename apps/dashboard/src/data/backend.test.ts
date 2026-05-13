@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   listBackendSessions,
   loadBackendSession,
+  listBackendSessionEvents,
+  openSessionEventSource,
+  postBackendMessage,
   sessionEventsToTraceEvents,
   sessionMessagesToChatMessages,
   type BackendSession,
@@ -118,5 +121,47 @@ describe('dashboard backend adapters', () => {
       events: [expect.objectContaining({ type: 'tool.requested' })],
     });
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions/sess%2F1', expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('lists backend events for a session by id', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        events: [{ id: 'evt-1', sessionId: 'sess/1', type: 'tool.requested', createdAt, data: { tool: 'test' } }],
+      }),
+    } as Response));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listBackendSessionEvents('sess/1', 'http://127.0.0.1:8787')).resolves.toEqual([
+      expect.objectContaining({ id: 'evt-1', type: 'tool.requested' }),
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions/sess%2F1/events', expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('posts messages with encoded backend session ids', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        message: { id: 'msg-1', role: 'user', content: 'Fix tests', createdAt },
+        session: { id: 'sess/1', title: 'Fix tests', projectPath: '/repo', messages: [], events: [] },
+      }),
+    } as Response));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(postBackendMessage('sess/1', 'Fix tests', 'http://127.0.0.1:8787')).resolves.toMatchObject({
+      message: expect.objectContaining({ content: 'Fix tests' }),
+    });
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions/sess%2F1/messages', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('opens session event streams with encoded backend session ids', () => {
+    const eventSourceMock = vi.fn();
+    vi.stubGlobal('EventSource', eventSourceMock);
+
+    openSessionEventSource('sess/1', 'http://127.0.0.1:8787');
+
+    expect(eventSourceMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions/sess%2F1/stream');
   });
 });

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { mockChatMessages, type ChatMessage } from '../../data/chat';
 import type { TraceEvent } from '../../data/loader';
 import {
   getBackendBaseUrl,
   createBackendSession,
+  listBackendSessionEvents,
   postBackendMessage,
   sessionEventsToTraceEvents,
   sessionMessagesToChatMessages,
@@ -28,6 +29,9 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages?.length ? initialMessages : mockChatMessages);
   const [status, setStatus] = useState('Ready');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const stopPollingRef = useRef<() => void>(() => {});
+  const mountedRef = useRef(true);
+  const submitTokenRef = useRef(0);
 
   useEffect(() => {
     if (initialMessages) setMessages(initialMessages.length ? initialMessages : mockChatMessages);
@@ -37,15 +41,33 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
     setSession(initialSession ?? null);
   }, [initialSession]);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      submitTokenRef.current += 1;
+      stopPollingRef.current();
+    };
+  }, []);
+
   async function handleSubmitMessage(content: string) {
+    const submitToken = submitTokenRef.current + 1;
+    submitTokenRef.current = submitToken;
+    const isCurrentSubmit = () => mountedRef.current && submitTokenRef.current === submitToken;
     setIsSubmitting(true);
     setStatus('Running scripted backend session…');
+    let stopPolling = () => {};
     try {
       const baseUrl = getBackendBaseUrl();
       const activeSession = session ?? await createBackendSession(projectPath, baseUrl);
+      if (!isCurrentSubmit()) return;
       setSession(activeSession);
       onSessionChange?.(activeSession);
+      stopPollingRef.current();
+      stopPolling = startSessionEventPolling(activeSession.id, baseUrl, onEventsChange);
+      stopPollingRef.current = stopPolling;
       const result = await postBackendMessage(activeSession.id, content, baseUrl);
+      if (!isCurrentSubmit()) return;
       const updatedSession = sessionWithReturnedRun(result);
       setSession(updatedSession);
       onSessionChange?.(updatedSession);
@@ -54,10 +76,13 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       const summary = result.run?.summary ?? 'Session updated';
       setStatus(summary);
     } catch (error) {
+      if (!isCurrentSubmit()) return;
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
     } finally {
-      setIsSubmitting(false);
+      stopPolling();
+      if (stopPollingRef.current === stopPolling) stopPollingRef.current = () => {};
+      if (isCurrentSubmit()) setIsSubmitting(false);
     }
   }
 
@@ -81,6 +106,27 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       />
     </section>
   );
+}
+
+function startSessionEventPolling(sessionId: string, baseUrl: string, onEventsChange?: (events: TraceEvent[]) => void): () => void {
+  if (!onEventsChange) return () => {};
+  let stopped = false;
+  let timeoutId: number | undefined;
+  const poll = async () => {
+    try {
+      const events = await listBackendSessionEvents(sessionId, baseUrl);
+      if (!stopped) onEventsChange(sessionEventsToTraceEvents(events));
+    } catch {
+      // Live updates are best-effort; final POST response still publishes the authoritative event snapshot.
+    } finally {
+      if (!stopped) timeoutId = window.setTimeout(() => { void poll(); }, 1000);
+    }
+  };
+  void poll();
+  return () => {
+    stopped = true;
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  };
 }
 
 function sessionWithReturnedRun(result: BackendCreateMessageResponse): BackendSession {

@@ -76,6 +76,10 @@ export interface BackendListSessionsResponse {
   sessions: BackendSessionSummary[];
 }
 
+export interface BackendListSessionEventsResponse {
+  events: BackendSessionEvent[];
+}
+
 export interface BackendCreateSessionResponse {
   session: BackendSession;
 }
@@ -130,6 +134,13 @@ export async function loadBackendSession(sessionId: string, baseUrl = ''): Promi
   return body.session;
 }
 
+export async function listBackendSessionEvents(sessionId: string, baseUrl = ''): Promise<BackendSessionEvent[]> {
+  const response = await fetch(`${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/events`, { method: 'GET' });
+  if (!response.ok) throw new Error(`Failed to list session events: ${response.status}`);
+  const body = await response.json() as BackendListSessionEventsResponse;
+  return body.events;
+}
+
 export async function createBackendSession(projectPath = '', baseUrl = ''): Promise<BackendSession> {
   const trimmedProjectPath = projectPath.trim();
   const response = await fetch(`${baseUrl}/api/sessions`, {
@@ -143,7 +154,7 @@ export async function createBackendSession(projectPath = '', baseUrl = ''): Prom
 }
 
 export async function postBackendMessage(sessionId: string, content: string, baseUrl = ''): Promise<BackendCreateMessageResponse> {
-  const response = await fetch(`${baseUrl}/api/sessions/${sessionId}/messages`, {
+  const response = await fetch(`${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/messages`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ content }),
@@ -153,7 +164,7 @@ export async function postBackendMessage(sessionId: string, content: string, bas
 }
 
 export function openSessionEventSource(sessionId: string, baseUrl = ''): EventSource {
-  return new EventSource(`${baseUrl}/api/sessions/${sessionId}/stream`);
+  return new EventSource(`${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/stream`);
 }
 
 function stringValue(value: unknown): string | undefined {
