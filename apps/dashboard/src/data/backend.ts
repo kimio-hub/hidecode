@@ -62,6 +62,20 @@ export interface BackendSessionReview {
   };
 }
 
+export interface BackendSessionSummary {
+  id: string;
+  title: string;
+  projectPath: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  eventCount: number;
+}
+
+export interface BackendListSessionsResponse {
+  sessions: BackendSessionSummary[];
+}
+
 export interface BackendCreateSessionResponse {
   session: BackendSession;
 }
@@ -96,6 +110,13 @@ export function sessionEventsToTraceEvents(events: BackendSessionEvent[]): Trace
     actor: stringValue(event.data.actor) ?? 'server',
     data: event.data,
   }));
+}
+
+export async function listBackendSessions(baseUrl = ''): Promise<BackendSessionSummary[]> {
+  const response = await fetch(`${baseUrl}/api/sessions`, { method: 'GET' });
+  if (!response.ok) throw new Error(`Failed to list sessions: ${response.status}`);
+  const body = await response.json() as BackendListSessionsResponse;
+  return body.sessions;
 }
 
 export async function createBackendSession(projectPath = '', baseUrl = ''): Promise<BackendSession> {

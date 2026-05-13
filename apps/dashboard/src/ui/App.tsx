@@ -18,8 +18,7 @@ import RightInspector from './components/RightInspector';
 import HomePage from './modes/HomePage';
 import ChatWorkspace from './modes/ChatWorkspace';
 import ReviewWorkspace from './modes/ReviewWorkspace';
-import type { BackendSession } from '../data/backend';
-import { getBackendBaseUrl } from '../data/backend';
+import { getBackendBaseUrl, listBackendSessions, type BackendSession, type BackendSessionSummary } from '../data/backend';
 import { recentProjects, type RecentProject } from '../data/projects';
 import { backendProjectToRecentProject, listBackendProjects, openBackendProject } from '../data/projects-backend';
 
@@ -35,6 +34,7 @@ export default function App() {
   const [chatSession, setChatSession] = useState<BackendSession | null>(null);
   const [selectedProject, setSelectedProject] = useState<RecentProject | null>(null);
   const [homeProjects, setHomeProjects] = useState<RecentProject[]>(recentProjects);
+  const [sessionSummaries, setSessionSummaries] = useState<BackendSessionSummary[]>([]);
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
@@ -115,6 +115,24 @@ export default function App() {
     };
   }, [source.kind, appSearch]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSessions() {
+      if (source.kind !== 'mock') return;
+      try {
+        const sessions = await listBackendSessions(getBackendBaseUrl());
+        if (!cancelled) setSessionSummaries(sessions);
+      } catch {
+        if (!cancelled) setSessionSummaries([]);
+      }
+    }
+
+    void loadSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, [source.kind, appSearch]);
+
   if (state.status === 'loading') {
     return <CenteredState title="Loading run trace…" detail={state.sourceLabel} />;
   }
@@ -170,7 +188,7 @@ export default function App() {
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>
       <AppShell
-        sidebar={<LeftSidebar currentSession={chatSession} selectedProject={selectedProject} />}
+        sidebar={<LeftSidebar currentSession={chatSession} selectedProject={selectedProject} sessionSummaries={sessionSummaries} />}
         workspace={workspace}
         inspector={<RightInspector events={shellEvents} />}
         status={<BottomStatusBar selectedProject={selectedProject} projectStatus={projectStatus} />}

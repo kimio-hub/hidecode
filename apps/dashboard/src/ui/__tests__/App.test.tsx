@@ -329,6 +329,38 @@ describe('App data loading', () => {
     expect(screen.getByText('ljquant')).toBeInTheDocument();
   });
 
+  it('loads backend session summaries into the sidebar', async () => {
+    setSearch('?api=http://127.0.0.1:8787&mode=chat');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === 'http://127.0.0.1:8787/api/sessions') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            sessions: [{
+              id: 'sess-sidebar',
+              title: 'Fix sidebar tests',
+              projectPath: '/tmp/app',
+              createdAt: '2026-05-12T09:00:00.000Z',
+              updatedAt: '2026-05-12T09:05:00.000Z',
+              messageCount: 3,
+              eventCount: 9,
+            }],
+          }),
+        } as Response;
+      }
+
+      return { ok: false, status: 418, json: async () => ({}) } as Response;
+    }));
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText('Fix sidebar tests')).toBeInTheDocument());
+    expect(screen.getByText('sess-sidebar')).toBeInTheDocument();
+    expect(screen.getByText('3 messages')).toBeInTheDocument();
+    expect(screen.getByText('9 events')).toBeInTheDocument();
+  });
+
   it('loads a run directory from the run query parameter', async () => {
     setSearch('?run=/runs/demo');
     const traceLine = JSON.stringify({

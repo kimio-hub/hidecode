@@ -1,12 +1,13 @@
 import type { RecentProject } from '../../data/projects';
-import type { BackendSession } from '../../data/backend';
+import type { BackendSession, BackendSessionSummary } from '../../data/backend';
 
 interface LeftSidebarProps {
   selectedProject?: RecentProject | null;
   currentSession?: BackendSession | null;
+  sessionSummaries?: BackendSessionSummary[];
 }
 
-export default function LeftSidebar({ selectedProject, currentSession }: LeftSidebarProps) {
+export default function LeftSidebar({ selectedProject, currentSession, sessionSummaries = [] }: LeftSidebarProps) {
   const latestRun = currentSession?.runs?.at(-1);
 
   return (
@@ -42,12 +43,33 @@ export default function LeftSidebar({ selectedProject, currentSession }: LeftSid
           <div style={styles.empty}>Open a folder to start a hidecode session.</div>
         )}
       </section>
+      <section>
+        <div style={styles.label}>Recent sessions</div>
+        {sessionSummaries.length > 0 ? (
+          <div style={styles.sessionList}>
+            {sessionSummaries.map((session) => (
+              <article key={session.id} style={styles.sessionCard}>
+                <div style={styles.sessionTitle}>{session.title}</div>
+                <div style={styles.sessionMeta}>{session.id}</div>
+                <div style={styles.sessionMeta}>{formatMessageCount(session.messageCount)}</div>
+                <div style={styles.sessionMeta}>{formatEventCount(session.eventCount)}</div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div style={styles.empty}>Recent backend sessions will appear here.</div>
+        )}
+      </section>
     </div>
   );
 }
 
 function formatMessageCount(count: number): string {
   return `${count} ${count === 1 ? 'message' : 'messages'}`;
+}
+
+function formatEventCount(count: number): string {
+  return `${count} ${count === 1 ? 'event' : 'events'}`;
 }
 
 const styles = {
@@ -96,6 +118,10 @@ const styles = {
     fontSize: '12px',
     display: 'grid',
     gap: '6px',
+  },
+  sessionList: {
+    display: 'grid',
+    gap: '8px',
   },
   sessionTitle: {
     color: '#ffffff',

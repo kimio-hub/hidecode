@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { sessionEventsToTraceEvents, sessionMessagesToChatMessages, type BackendSession } from './backend';
+import {
+  listBackendSessions,
+  sessionEventsToTraceEvents,
+  sessionMessagesToChatMessages,
+  type BackendSession,
+} from './backend';
 
 const createdAt = '2026-05-11T22:00:00.000Z';
 
@@ -55,5 +60,37 @@ describe('dashboard backend adapters', () => {
         data: { runId: 'run-1', taskId: 'task-1', actor: 'orchestrator', tool: 'read' },
       },
     ]);
+  });
+
+  it('lists backend session summaries from the local app backend', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        sessions: [{
+          id: 'sess-1',
+          title: 'hidecode session',
+          projectPath: '/repo',
+          createdAt,
+          updatedAt: createdAt,
+          messageCount: 2,
+          eventCount: 5,
+        }],
+      }),
+    } as Response));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listBackendSessions('http://127.0.0.1:8787')).resolves.toEqual([
+      {
+        id: 'sess-1',
+        title: 'hidecode session',
+        projectPath: '/repo',
+        createdAt,
+        updatedAt: createdAt,
+        messageCount: 2,
+        eventCount: 5,
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions', expect.objectContaining({ method: 'GET' }));
   });
 });
