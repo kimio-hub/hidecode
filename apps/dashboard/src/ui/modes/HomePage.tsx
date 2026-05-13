@@ -1,5 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import CloneRepositoryPreview from '../components/CloneRepositoryPreview';
 import ModelSafetySetup from '../components/ModelSafetySetup';
+import OpenFolderForm from '../components/OpenFolderForm';
 import QuickStartPanel from '../components/QuickStartPanel';
 import RecentProjectsPanel from '../components/RecentProjectsPanel';
 import type { RecentProject } from '../../data/projects';
@@ -12,32 +14,6 @@ interface HomePageProps {
 export default function HomePage({ onOpenProject, projects }: HomePageProps) {
   const [showManualForm, setShowManualForm] = useState(false);
   const [showCloneForm, setShowCloneForm] = useState(false);
-  const [projectPath, setProjectPath] = useState('');
-  const [projectName, setProjectName] = useState('');
-  const [repositoryUrl, setRepositoryUrl] = useState('');
-  const [destinationPath, setDestinationPath] = useState('');
-  const normalizedPath = normalizePath(projectPath);
-  const normalizedRepositoryUrl = repositoryUrl.trim();
-  const normalizedDestinationPath = normalizePath(destinationPath);
-  const canPreviewClone = Boolean(normalizedRepositoryUrl && normalizedDestinationPath);
-
-  const submitManualProject = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!normalizedPath || !onOpenProject) return;
-
-    const name = projectName.trim() || deriveNameFromPath(normalizedPath);
-    onOpenProject({
-      id: slugProjectId(name || normalizedPath),
-      name,
-      path: normalizedPath,
-      description: 'Manually opened project',
-      lastOpened: 'Just now',
-    });
-  };
-
-  const previewCloneRepository = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-  };
 
   return (
     <div style={styles.page}>
@@ -51,58 +27,8 @@ export default function HomePage({ onOpenProject, projects }: HomePageProps) {
           <button type="button" style={styles.primaryButton} onClick={() => setShowManualForm(true)}>Open Folder</button>
           <button type="button" style={styles.secondaryButton} onClick={() => setShowCloneForm(true)}>Clone Repository</button>
         </div>
-        {showManualForm ? (
-          <form aria-label="Open project folder manually" style={styles.manualForm} onSubmit={submitManualProject}>
-            <label style={styles.fieldLabel}>
-              Project path
-              <input
-                value={projectPath}
-                onChange={(event) => setProjectPath(event.target.value)}
-                placeholder="/path/to/project"
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.fieldLabel}>
-              Project name
-              <input
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                placeholder="Optional"
-                style={styles.input}
-              />
-            </label>
-            <button type="submit" style={styles.submitButton} disabled={!normalizedPath}>Open Project</button>
-          </form>
-        ) : null}
-        {showCloneForm ? (
-          <form aria-label="Clone repository preview" style={styles.cloneForm} onSubmit={previewCloneRepository}>
-            <label style={styles.fieldLabel}>
-              Repository URL
-              <input
-                value={repositoryUrl}
-                onChange={(event) => setRepositoryUrl(event.target.value)}
-                placeholder="https://example.com/repo.git"
-                style={styles.input}
-              />
-            </label>
-            <label style={styles.fieldLabel}>
-              Destination path
-              <input
-                value={destinationPath}
-                onChange={(event) => setDestinationPath(event.target.value)}
-                placeholder="/path/to/destination"
-                style={styles.input}
-              />
-            </label>
-            <button type="submit" style={styles.submitButton} disabled={!canPreviewClone}>Preview Clone</button>
-            {canPreviewClone ? (
-              <div style={styles.clonePreview}>
-                <code>git clone {normalizedRepositoryUrl} {normalizedDestinationPath}</code>
-                <span>Preview only — cloning requires explicit backend approval.</span>
-              </div>
-            ) : null}
-          </form>
-        ) : null}
+        {showManualForm ? <OpenFolderForm onOpenProject={onOpenProject} /> : null}
+        {showCloneForm ? <CloneRepositoryPreview /> : null}
         <div style={styles.dropZone}>Drag a project folder here</div>
       </div>
       <div style={styles.grid}>
@@ -114,21 +40,6 @@ export default function HomePage({ onOpenProject, projects }: HomePageProps) {
       </div>
     </div>
   );
-}
-
-function normalizePath(path: string): string {
-  const trimmed = path.trim();
-  if (trimmed === '/' || /^[A-Za-z]:\\$/.test(trimmed)) return trimmed;
-  return trimmed.replace(/[\\/]+$/, '');
-}
-
-function deriveNameFromPath(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) || path;
-}
-
-function slugProjectId(value: string): string {
-  const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return slug || 'manual-project';
 }
 
 const styles = {
@@ -196,59 +107,6 @@ const styles = {
     fontSize: '13px',
     textAlign: 'center',
     background: 'rgba(15, 23, 42, 0.55)',
-  },
-  manualForm: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(220px, 1fr) minmax(180px, 0.7fr) auto',
-    gap: '10px',
-    alignItems: 'end',
-    marginTop: '16px',
-    padding: '14px',
-    border: '1px solid #263145',
-    borderRadius: '16px',
-    background: 'rgba(15, 23, 42, 0.7)',
-  },
-  cloneForm: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(220px, 1fr) minmax(220px, 1fr) auto',
-    gap: '10px',
-    alignItems: 'end',
-    marginTop: '16px',
-    padding: '14px',
-    border: '1px solid #263145',
-    borderRadius: '16px',
-    background: 'rgba(15, 23, 42, 0.7)',
-  },
-  fieldLabel: {
-    display: 'grid',
-    gap: '6px',
-    color: '#cbd5e1',
-    fontSize: '12px',
-    fontWeight: 800,
-  },
-  input: {
-    border: '1px solid #334155',
-    borderRadius: '10px',
-    background: '#080b13',
-    color: '#f8fafc',
-    padding: '9px 10px',
-    fontSize: '13px',
-  },
-  submitButton: {
-    border: 0,
-    borderRadius: '10px',
-    background: '#60a5fa',
-    color: '#06111f',
-    padding: '10px 12px',
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
-  clonePreview: {
-    gridColumn: '1 / -1',
-    display: 'grid',
-    gap: '6px',
-    color: '#a4aec3',
-    fontSize: '12px',
   },
   grid: {
     display: 'grid',
