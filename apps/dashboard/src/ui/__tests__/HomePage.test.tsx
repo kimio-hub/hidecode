@@ -25,6 +25,51 @@ describe('HomePage', () => {
     expect(screen.getByRole('button', { name: 'Open Project' })).toBeDisabled();
   });
 
+  it('shows a clone repository preview form when Clone Repository is clicked', () => {
+    render(<HomePage />);
+
+    expect(screen.queryByRole('form', { name: 'Clone repository preview' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clone Repository' }));
+
+    expect(screen.getByRole('form', { name: 'Clone repository preview' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Repository URL')).toBeInTheDocument();
+    expect(screen.getByLabelText('Destination path')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Preview Clone' })).toBeDisabled();
+  });
+
+  it('keeps clone preview submit disabled until repository URL and destination path are non-empty', () => {
+    render(<HomePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clone Repository' }));
+    const submit = screen.getByRole('button', { name: 'Preview Clone' });
+
+    fireEvent.change(screen.getByLabelText('Repository URL'), { target: { value: 'https://example.com/repo.git' } });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Destination path'), { target: { value: '/tmp/repo' } });
+    expect(submit).toBeEnabled();
+  });
+
+  it('shows clone command preview and preview-only safety text without side effects', () => {
+    const onOpenProject = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    render(<HomePage onOpenProject={onOpenProject} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clone Repository' }));
+    fireEvent.change(screen.getByLabelText('Repository URL'), { target: { value: 'https://example.com/repo.git' } });
+    fireEvent.change(screen.getByLabelText('Destination path'), { target: { value: '/tmp/repo' } });
+
+    expect(screen.getByText('git clone https://example.com/repo.git /tmp/repo')).toBeInTheDocument();
+    expect(screen.getByText('Preview only — cloning requires explicit backend approval.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Clone' }));
+
+    expect(onOpenProject).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('submits a typed path and uses the explicit project name', () => {
     const onOpenProject = vi.fn();
     render(<HomePage onOpenProject={onOpenProject} />);

@@ -11,9 +11,15 @@ interface HomePageProps {
 
 export default function HomePage({ onOpenProject, projects }: HomePageProps) {
   const [showManualForm, setShowManualForm] = useState(false);
+  const [showCloneForm, setShowCloneForm] = useState(false);
   const [projectPath, setProjectPath] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [repositoryUrl, setRepositoryUrl] = useState('');
+  const [destinationPath, setDestinationPath] = useState('');
   const normalizedPath = normalizePath(projectPath);
+  const normalizedRepositoryUrl = repositoryUrl.trim();
+  const normalizedDestinationPath = normalizePath(destinationPath);
+  const canPreviewClone = Boolean(normalizedRepositoryUrl && normalizedDestinationPath);
 
   const submitManualProject = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,6 +35,10 @@ export default function HomePage({ onOpenProject, projects }: HomePageProps) {
     });
   };
 
+  const previewCloneRepository = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+  };
+
   return (
     <div style={styles.page}>
       <div style={styles.hero}>
@@ -39,7 +49,7 @@ export default function HomePage({ onOpenProject, projects }: HomePageProps) {
         </p>
         <div style={styles.actions}>
           <button type="button" style={styles.primaryButton} onClick={() => setShowManualForm(true)}>Open Folder</button>
-          <button type="button" style={styles.secondaryButton}>Clone Repository</button>
+          <button type="button" style={styles.secondaryButton} onClick={() => setShowCloneForm(true)}>Clone Repository</button>
         </div>
         {showManualForm ? (
           <form aria-label="Open project folder manually" style={styles.manualForm} onSubmit={submitManualProject}>
@@ -62,6 +72,35 @@ export default function HomePage({ onOpenProject, projects }: HomePageProps) {
               />
             </label>
             <button type="submit" style={styles.submitButton} disabled={!normalizedPath}>Open Project</button>
+          </form>
+        ) : null}
+        {showCloneForm ? (
+          <form aria-label="Clone repository preview" style={styles.cloneForm} onSubmit={previewCloneRepository}>
+            <label style={styles.fieldLabel}>
+              Repository URL
+              <input
+                value={repositoryUrl}
+                onChange={(event) => setRepositoryUrl(event.target.value)}
+                placeholder="https://example.com/repo.git"
+                style={styles.input}
+              />
+            </label>
+            <label style={styles.fieldLabel}>
+              Destination path
+              <input
+                value={destinationPath}
+                onChange={(event) => setDestinationPath(event.target.value)}
+                placeholder="/path/to/destination"
+                style={styles.input}
+              />
+            </label>
+            <button type="submit" style={styles.submitButton} disabled={!canPreviewClone}>Preview Clone</button>
+            {canPreviewClone ? (
+              <div style={styles.clonePreview}>
+                <code>git clone {normalizedRepositoryUrl} {normalizedDestinationPath}</code>
+                <span>Preview only — cloning requires explicit backend approval.</span>
+              </div>
+            ) : null}
           </form>
         ) : null}
         <div style={styles.dropZone}>Drag a project folder here</div>
@@ -169,6 +208,17 @@ const styles = {
     borderRadius: '16px',
     background: 'rgba(15, 23, 42, 0.7)',
   },
+  cloneForm: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(220px, 1fr) minmax(220px, 1fr) auto',
+    gap: '10px',
+    alignItems: 'end',
+    marginTop: '16px',
+    padding: '14px',
+    border: '1px solid #263145',
+    borderRadius: '16px',
+    background: 'rgba(15, 23, 42, 0.7)',
+  },
   fieldLabel: {
     display: 'grid',
     gap: '6px',
@@ -192,6 +242,13 @@ const styles = {
     padding: '10px 12px',
     fontWeight: 900,
     cursor: 'pointer',
+  },
+  clonePreview: {
+    gridColumn: '1 / -1',
+    display: 'grid',
+    gap: '6px',
+    color: '#a4aec3',
+    fontSize: '12px',
   },
   grid: {
     display: 'grid',
