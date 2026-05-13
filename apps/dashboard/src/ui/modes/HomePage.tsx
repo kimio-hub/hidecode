@@ -4,14 +4,15 @@ import ModelSafetySetup from '../components/ModelSafetySetup';
 import OpenFolderForm from '../components/OpenFolderForm';
 import QuickStartPanel from '../components/QuickStartPanel';
 import RecentProjectsPanel from '../components/RecentProjectsPanel';
-import type { RecentProject } from '../../data/projects';
+import type { QuickStartAction, RecentProject } from '../../data/projects';
 
 interface HomePageProps {
   onOpenProject?: (project: RecentProject) => void;
+  onQuickStart?: (action: QuickStartAction) => void;
   projects?: RecentProject[];
 }
 
-export default function HomePage({ onOpenProject, projects }: HomePageProps) {
+export default function HomePage({ onOpenProject, onQuickStart, projects }: HomePageProps) {
   const [showManualForm, setShowManualForm] = useState(false);
   const [showCloneForm, setShowCloneForm] = useState(false);
 
@@ -34,7 +35,7 @@ export default function HomePage({ onOpenProject, projects }: HomePageProps) {
       <div style={styles.grid}>
         <RecentProjectsPanel onOpenProject={onOpenProject} projects={projects} />
         <div style={styles.sideStack}>
-          <QuickStartPanel />
+          <QuickStartPanel onSelectAction={onQuickStart} />
           <ModelSafetySetup />
         </div>
       </div>

@@ -22,9 +22,10 @@ interface ChatPanelProps {
   projectPath?: string;
   initialMessages?: ChatMessage[];
   initialSession?: BackendSession | null;
+  initialDraft?: string;
 }
 
-export default function ChatPanel({ onReview, onEventsChange, onSessionChange, projectPath = '', initialMessages, initialSession }: ChatPanelProps) {
+export default function ChatPanel({ onReview, onEventsChange, onSessionChange, projectPath = '', initialMessages, initialSession, initialDraft = '' }: ChatPanelProps) {
   const [session, setSession] = useState<BackendSession | null>(initialSession ?? null);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages?.length ? initialMessages : mockChatMessages);
   const [status, setStatus] = useState('Ready');
@@ -99,6 +100,7 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       <MessageList messages={messages} />
       <MessageComposer
         disabled={isSubmitting}
+        initialContent={initialDraft}
         onPlan={() => setStatus('Plan preview is not wired yet.')}
         onReview={onReview}
         onStop={() => setStatus('Stop is not wired yet.')}

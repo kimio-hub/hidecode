@@ -10,8 +10,9 @@ interface ChatWorkspaceProps {
   projectPath?: string;
   initialMessages?: ChatMessage[];
   initialSession?: BackendSession | null;
+  initialDraft?: string;
 }
 
-export default function ChatWorkspace({ onReview, onEventsChange, onSessionChange, projectPath, initialMessages, initialSession }: ChatWorkspaceProps) {
-  return <ChatPanel initialMessages={initialMessages} initialSession={initialSession} onEventsChange={onEventsChange} onReview={onReview} onSessionChange={onSessionChange} projectPath={projectPath} />;
+export default function ChatWorkspace({ onReview, onEventsChange, onSessionChange, projectPath, initialMessages, initialSession, initialDraft }: ChatWorkspaceProps) {
+  return <ChatPanel initialDraft={initialDraft} initialMessages={initialMessages} initialSession={initialSession} onEventsChange={onEventsChange} onReview={onReview} onSessionChange={onSessionChange} projectPath={projectPath} />;
 }

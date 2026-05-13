@@ -19,7 +19,7 @@ import HomePage from './modes/HomePage';
 import ChatWorkspace from './modes/ChatWorkspace';
 import ReviewWorkspace from './modes/ReviewWorkspace';
 import { getBackendBaseUrl, listBackendSessions, loadBackendSession, sessionEventsToTraceEvents, sessionMessagesToChatMessages, type BackendSession, type BackendSessionSummary } from '../data/backend';
-import { recentProjects, type RecentProject } from '../data/projects';
+import { recentProjects, type QuickStartAction, type RecentProject } from '../data/projects';
 import { backendProjectToRecentProject, listBackendProjects, openBackendProject } from '../data/projects-backend';
 
 type LoadState =
@@ -36,6 +36,7 @@ export default function App() {
   const [homeProjects, setHomeProjects] = useState<RecentProject[]>(recentProjects);
   const [sessionSummaries, setSessionSummaries] = useState<BackendSessionSummary[]>([]);
   const [chatInitialMessages, setChatInitialMessages] = useState(() => sessionMessagesToChatMessages([]));
+  const [chatInitialDraft, setChatInitialDraft] = useState('');
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
@@ -160,8 +161,23 @@ export default function App() {
     window.history.pushState(null, '', nextSearch);
     setAppSearch(nextSearch);
   };
+  const openQuickStart = (action: QuickStartAction) => {
+    setChatSession(null);
+    setChatEvents([]);
+    setChatInitialMessages(sessionMessagesToChatMessages([]));
+    setChatInitialDraft(action.prompt);
+    setSelectedProject(null);
+    setProjectStatus(`Drafted ${action.title}`);
+    const nextSearch = withAppMode(appSearch, 'chat');
+    window.history.pushState(null, '', nextSearch);
+    setAppSearch(nextSearch);
+  };
   const openProject = async (project: RecentProject) => {
     setSelectedProject(null);
+    setChatSession(null);
+    setChatEvents([]);
+    setChatInitialMessages(sessionMessagesToChatMessages([]));
+    setChatInitialDraft('');
     setProjectStatus(`Opening ${project.name}…`);
     try {
       const openedProject = await openBackendProject(project, getBackendBaseUrl());
@@ -181,6 +197,7 @@ export default function App() {
     }
   };
   const loadRecentSession = async (sessionId: string) => {
+    setChatInitialDraft('');
     setProjectStatus(`Loading session ${sessionId}…`);
     try {
       const session = await loadBackendSession(sessionId, getBackendBaseUrl());
@@ -205,8 +222,8 @@ export default function App() {
   const workspace = appState.mode === 'review'
     ? <ReviewWorkspace session={chatSession} />
     : appState.mode === 'chat'
-      ? <ChatWorkspace initialMessages={chatInitialMessages} initialSession={chatSession} onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} projectPath={selectedProject?.path} />
-      : <HomePage onOpenProject={openProject} projects={homeProjects} />;
+      ? <ChatWorkspace initialDraft={chatInitialDraft} initialMessages={chatInitialMessages} initialSession={chatSession} onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} projectPath={selectedProject?.path} />
+      : <HomePage onOpenProject={openProject} onQuickStart={openQuickStart} projects={homeProjects} />;
 
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>

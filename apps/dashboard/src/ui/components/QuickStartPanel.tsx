@@ -1,12 +1,16 @@
-import { quickStartActions } from '../../data/projects';
+import { quickStartActions, type QuickStartAction } from '../../data/projects';
 
-export default function QuickStartPanel() {
+interface QuickStartPanelProps {
+  onSelectAction?: (action: QuickStartAction) => void;
+}
+
+export default function QuickStartPanel({ onSelectAction }: QuickStartPanelProps) {
   return (
     <section aria-label="Quick start" style={styles.panel}>
       <div style={styles.heading}>Quick Start</div>
       <div style={styles.grid}>
         {quickStartActions.map((action) => (
-          <button key={action.id} type="button" style={styles.card}>
+          <button key={action.id} type="button" style={styles.card} onClick={() => onSelectAction?.(action)}>
             <span style={styles.title}>{action.title}</span>
             <span style={styles.description}>{action.description}</span>
           </button>

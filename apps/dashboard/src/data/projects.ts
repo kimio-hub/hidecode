@@ -10,6 +10,7 @@ export interface QuickStartAction {
   id: string;
   title: string;
   description: string;
+  prompt: string;
 }
 
 export interface ModelSafetyItem {
@@ -44,10 +45,30 @@ export const recentProjects: RecentProject[] = [
 ];
 
 export const quickStartActions: QuickStartAction[] = [
-  { id: 'fix-tests', title: 'Fix failing tests', description: 'Run tests, inspect failures, and propose a safe patch.' },
-  { id: 'review-diff', title: 'Review current diff', description: 'Explain changed files and surface risky edits.' },
-  { id: 'explain-codebase', title: 'Explain this codebase', description: 'Map the project structure and important flows.' },
-  { id: 'plan-feature', title: 'Plan a new feature', description: 'Turn a request into milestones and implementation tasks.' },
+  {
+    id: 'fix-tests',
+    title: 'Fix failing tests',
+    description: 'Run tests, inspect failures, and propose a safe patch.',
+    prompt: 'Run the test suite, inspect the failing tests, and propose the smallest safe patch.',
+  },
+  {
+    id: 'review-diff',
+    title: 'Review current diff',
+    description: 'Explain changed files and surface risky edits.',
+    prompt: 'Review the current git diff, explain the changed files, and surface risky edits before commit.',
+  },
+  {
+    id: 'explain-codebase',
+    title: 'Explain this codebase',
+    description: 'Map the project structure and important flows.',
+    prompt: 'Explain this codebase: map the project structure, important flows, and where I should start.',
+  },
+  {
+    id: 'plan-feature',
+    title: 'Plan a new feature',
+    description: 'Turn a request into milestones and implementation tasks.',
+    prompt: 'Plan a new feature: clarify scope, split it into milestones, and list implementation tasks.',
+  },
 ];
 
 export const modelSafetySetup: ModelSafetyItem[] = [

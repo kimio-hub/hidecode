@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface MessageComposerProps {
   onPlan?: () => void;
@@ -6,10 +6,15 @@ interface MessageComposerProps {
   onStop?: () => void;
   onSubmitMessage?: (content: string) => Promise<void> | void;
   disabled?: boolean;
+  initialContent?: string;
 }
 
-export default function MessageComposer({ onPlan, onReview, onStop, onSubmitMessage, disabled = false }: MessageComposerProps) {
-  const [content, setContent] = useState('');
+export default function MessageComposer({ onPlan, onReview, onStop, onSubmitMessage, disabled = false, initialContent = '' }: MessageComposerProps) {
+  const [content, setContent] = useState(initialContent);
+
+  useEffect(() => {
+    setContent(initialContent);
+  }, [initialContent]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

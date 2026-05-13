@@ -44,6 +44,17 @@ describe('App data loading', () => {
     expect(screen.getByRole('heading', { name: 'Review proposed changes' })).toBeInTheDocument();
   });
 
+  it('switches from Home Quick Start to Chat with a prefilled draft', async () => {
+    setSearch('');
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Fix failing tests/ }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getByLabelText('Message hidecode')).toHaveValue('Run the test suite, inspect the failing tests, and propose the smallest safe patch.');
+    expect(screen.getByText('Drafted Fix failing tests')).toBeInTheDocument();
+  });
+
   it('carries backend session review from chat into review mode', async () => {
     setSearch('?mode=chat');
     const createdAt = '2026-05-11T22:00:00.000Z';
