@@ -34,12 +34,21 @@ export default function CloneRepositoryPreview() {
       <button type="submit" style={styles.submitButton} disabled={!canPreviewClone}>Preview Clone</button>
       {canPreviewClone ? (
         <div style={styles.clonePreview}>
-          <code>git clone {normalizedRepositoryUrl} {normalizedDestinationPath}</code>
+          <code>{buildCloneCommand(normalizedRepositoryUrl, normalizedDestinationPath)}</code>
           <span>Preview only — cloning requires explicit backend approval.</span>
         </div>
       ) : null}
     </form>
   );
+}
+
+function buildCloneCommand(repositoryUrl: string, destinationPath: string): string {
+  return `git clone ${quoteShellArg(repositoryUrl)} ${quoteShellArg(destinationPath)}`;
+}
+
+function quoteShellArg(value: string): string {
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function normalizePath(path: string): string {

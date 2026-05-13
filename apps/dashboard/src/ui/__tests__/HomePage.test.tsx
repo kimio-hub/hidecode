@@ -70,6 +70,16 @@ describe('HomePage', () => {
     fetchSpy.mockRestore();
   });
 
+  it('quotes clone command preview arguments with spaces, quotes, and shell metacharacters', () => {
+    render(<HomePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clone Repository' }));
+    fireEvent.change(screen.getByLabelText('Repository URL'), { target: { value: "https://example.com/team's repo.git" } });
+    fireEvent.change(screen.getByLabelText('Destination path'), { target: { value: "/tmp/project; rm -rf nope" } });
+
+    expect(screen.getByText("git clone 'https://example.com/team'\"'\"'s repo.git' '/tmp/project; rm -rf nope'")).toBeInTheDocument();
+  });
+
   it('submits a typed path and uses the explicit project name', () => {
     const onOpenProject = vi.fn();
     render(<HomePage onOpenProject={onOpenProject} />);
