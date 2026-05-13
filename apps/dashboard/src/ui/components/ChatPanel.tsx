@@ -7,6 +7,7 @@ import {
   postBackendMessage,
   sessionEventsToTraceEvents,
   sessionMessagesToChatMessages,
+  type BackendCreateMessageResponse,
   type BackendSession,
 } from '../../data/backend';
 import MessageComposer from './MessageComposer';
@@ -35,10 +36,11 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       setSession(activeSession);
       onSessionChange?.(activeSession);
       const result = await postBackendMessage(activeSession.id, content, baseUrl);
-      setSession(result.session);
-      onSessionChange?.(result.session);
-      setMessages(sessionMessagesToChatMessages(result.session.messages));
-      onEventsChange?.(sessionEventsToTraceEvents(result.session.events));
+      const updatedSession = sessionWithReturnedRun(result);
+      setSession(updatedSession);
+      onSessionChange?.(updatedSession);
+      setMessages(sessionMessagesToChatMessages(updatedSession.messages));
+      onEventsChange?.(sessionEventsToTraceEvents(updatedSession.events));
       const summary = result.run?.summary ?? 'Session updated';
       setStatus(summary);
     } catch (error) {
@@ -69,6 +71,25 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       />
     </section>
   );
+}
+
+function sessionWithReturnedRun(result: BackendCreateMessageResponse): BackendSession {
+  if (!result.run) return result.session;
+  if (result.session.runs?.some((run) => run.summary === result.run?.summary && run.tracePath === result.run?.tracePath)) {
+    return result.session;
+  }
+
+  return {
+    ...result.session,
+    runs: [
+      ...(result.session.runs ?? []),
+      {
+        ...result.run,
+        id: `run-${result.session.runs?.length ?? 0}`,
+        createdAt: result.message.createdAt,
+      },
+    ],
+  };
 }
 
 function getRunProgressStatus(status: string, isSubmitting: boolean): RunProgressStatus {

@@ -154,6 +154,11 @@ describe('App data loading', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     await waitFor(() => expect(screen.getAllByText('scripted run complete').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('hidecode session').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('sess-project').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('1 message')).toBeInTheDocument();
+    expect(screen.getAllByText('scripted run complete').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('completed').length).toBeGreaterThanOrEqual(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/projects/open', expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
   });

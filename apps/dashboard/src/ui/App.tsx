@@ -170,7 +170,7 @@ export default function App() {
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>
       <AppShell
-        sidebar={<LeftSidebar selectedProject={selectedProject} />}
+        sidebar={<LeftSidebar currentSession={chatSession} selectedProject={selectedProject} />}
         workspace={workspace}
         inspector={<RightInspector events={shellEvents} />}
         status={<BottomStatusBar selectedProject={selectedProject} projectStatus={projectStatus} />}
