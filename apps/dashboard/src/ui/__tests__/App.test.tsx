@@ -55,6 +55,74 @@ describe('App data loading', () => {
     expect(screen.getByText('Drafted Fix failing tests')).toBeInTheDocument();
   });
 
+  it('keeps the selected project context when Quick Start is clicked from an opened project chat', async () => {
+    setSearch('');
+    const createdAt = '2026-05-12T12:00:00.000Z';
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/projects/open') {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ project: { id: 'hidecode', name: 'hidecode', path: '~/world-harness', openedAt: createdAt } }),
+        } as Response;
+      }
+
+      if (url === '/api/sessions') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ projectPath: '~/world-harness', title: 'hidecode session' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-quick-project', title: 'hidecode session', projectPath: '~/world-harness', messages: [], events: [] },
+          }),
+        } as Response;
+      }
+
+      if (url === '/api/sessions/sess-quick-project/messages') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ content: 'Run the test suite, inspect the failing tests, and propose the smallest safe patch.\n\nProject: ~/world-harness' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            message: { id: 'msg-quick-project', role: 'user', content: 'Run the test suite, inspect the failing tests, and propose the smallest safe patch.\n\nProject: ~/world-harness', createdAt },
+            run: { ok: true, summary: 'project quick start complete', tracePath: '~/world-harness/.runs/run-1/trace.jsonl', reportPath: '~/world-harness/.runs/run-1/report.md', steps: 1, durationMs: 5 },
+            session: {
+              id: 'sess-quick-project',
+              title: 'hidecode session',
+              projectPath: '~/world-harness',
+              messages: [{ id: 'msg-quick-project', role: 'user', content: 'Run the test suite, inspect the failing tests, and propose the smallest safe patch.\n\nProject: ~/world-harness', createdAt }],
+              events: [],
+            },
+          }),
+        } as Response;
+      }
+
+      return { ok: false, status: 418, json: async () => ({ error: `unexpected_url:${url}` }) } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /hidecode.*~\/world-harness/s }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getAllByText(/project: ~\/world-harness/).length).toBeGreaterThanOrEqual(1);
+
+    window.history.pushState(null, '', '?mode=home');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Build with hidecode' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /Fix failing tests/ }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getByLabelText('Message hidecode')).toHaveValue('Run the test suite, inspect the failing tests, and propose the smallest safe patch.\n\nProject: ~/world-harness');
+    expect(screen.getAllByText(/project: ~\/world-harness/).length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await waitFor(() => expect(screen.getAllByText('project quick start complete').length).toBeGreaterThan(0));
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-quick-project/messages', expect.any(Object));
+  });
+
   it('carries backend session review from chat into review mode', async () => {
     setSearch('?mode=chat');
     const createdAt = '2026-05-11T22:00:00.000Z';

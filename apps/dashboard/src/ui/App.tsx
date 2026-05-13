@@ -162,11 +162,11 @@ export default function App() {
     setAppSearch(nextSearch);
   };
   const openQuickStart = (action: QuickStartAction) => {
+    const draft = selectedProject?.path ? `${action.prompt}\n\nProject: ${selectedProject.path}` : action.prompt;
     setChatSession(null);
     setChatEvents([]);
     setChatInitialMessages(sessionMessagesToChatMessages([]));
-    setChatInitialDraft(action.prompt);
-    setSelectedProject(null);
+    setChatInitialDraft(draft);
     setProjectStatus(`Drafted ${action.title}`);
     const nextSearch = withAppMode(appSearch, 'chat');
     window.history.pushState(null, '', nextSearch);
