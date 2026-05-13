@@ -58,7 +58,13 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       </div>
       <div aria-live="polite" style={styles.status}>{status}</div>
       <MessageList messages={messages} />
-      <MessageComposer disabled={isSubmitting} onReview={onReview} onSubmitMessage={handleSubmitMessage} />
+      <MessageComposer
+        disabled={isSubmitting}
+        onPlan={() => setStatus('Plan preview is not wired yet.')}
+        onReview={onReview}
+        onStop={() => setStatus('Stop is not wired yet.')}
+        onSubmitMessage={handleSubmitMessage}
+      />
     </section>
   );
 }

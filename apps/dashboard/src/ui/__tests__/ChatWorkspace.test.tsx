@@ -28,11 +28,39 @@ describe('ChatWorkspace', () => {
 
   it('calls review mode callback from the Review quick action', () => {
     let requestedMode = '';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     render(<ChatWorkspace onReview={() => { requestedMode = 'review'; }} />);
 
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Review this without running' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
 
     expect(requestedMode).toBe('review');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows Plan as preview-only without submitting composer content', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ChatWorkspace />);
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Plan this without running' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+
+    expect(screen.getByText('Plan preview is not wired yet.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows Stop as preview-only without submitting composer content', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ChatWorkspace />);
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Stop this without running' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+
+    expect(screen.getByText('Stop is not wired yet.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('creates a backend session, submits a message, and publishes inspector events', async () => {

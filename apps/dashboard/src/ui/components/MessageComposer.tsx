@@ -1,12 +1,14 @@
 import { useState } from 'react';
 
 interface MessageComposerProps {
+  onPlan?: () => void;
   onReview?: () => void;
+  onStop?: () => void;
   onSubmitMessage?: (content: string) => Promise<void> | void;
   disabled?: boolean;
 }
 
-export default function MessageComposer({ onReview, onSubmitMessage, disabled = false }: MessageComposerProps) {
+export default function MessageComposer({ onPlan, onReview, onStop, onSubmitMessage, disabled = false }: MessageComposerProps) {
   const [content, setContent] = useState('');
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -28,17 +30,18 @@ export default function MessageComposer({ onReview, onSubmitMessage, disabled = 
         value={content}
       />
       <div style={styles.actions}>
-        {['Run', 'Plan', 'Review', 'Stop'].map((action) => (
-          <button
-            key={action}
-            disabled={disabled && action === 'Run'}
-            type={action === 'Run' ? 'submit' : 'button'}
-            onClick={action === 'Review' ? onReview : undefined}
-            style={action === 'Run' ? styles.primaryButton : styles.secondaryButton}
-          >
-            {action}
-          </button>
-        ))}
+        <button disabled={disabled} type="submit" style={styles.primaryButton}>
+          Run
+        </button>
+        <button type="button" onClick={onPlan} style={styles.secondaryButton}>
+          Plan
+        </button>
+        <button type="button" onClick={onReview} style={styles.secondaryButton}>
+          Review
+        </button>
+        <button type="button" onClick={onStop} style={styles.secondaryButton}>
+          Stop
+        </button>
       </div>
     </form>
   );
