@@ -1,17 +1,29 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
+import type { QuickStartAction } from '../../data/projects';
 
-export default function CloneRepositoryPreview() {
+interface CloneRepositoryPreviewProps {
+  onPreviewClone?: (action: QuickStartAction) => void;
+}
+
+export default function CloneRepositoryPreview({ onPreviewClone }: CloneRepositoryPreviewProps) {
   const [repositoryUrl, setRepositoryUrl] = useState('');
   const [destinationPath, setDestinationPath] = useState('');
   const [previewStatus, setPreviewStatus] = useState('');
   const normalizedRepositoryUrl = repositoryUrl.trim();
   const normalizedDestinationPath = normalizePath(destinationPath);
   const canPreviewClone = Boolean(normalizedRepositoryUrl && normalizedDestinationPath);
+  const cloneCommand = canPreviewClone ? buildCloneCommand(normalizedRepositoryUrl, normalizedDestinationPath) : '';
 
   const previewCloneRepository = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canPreviewClone) return;
     setPreviewStatus('Clone preview staged — backend approval is required before any network or filesystem action.');
+    onPreviewClone?.({
+      id: 'clone-repository',
+      title: 'Clone repository',
+      description: 'Prepare a backend-approved repository clone request.',
+      prompt: `Prepare this clone request for backend approval before any network or filesystem action:\n\n\`${cloneCommand}\`\n\nDo not run the clone until explicit backend approval is granted.`,
+    });
   };
 
   return (
@@ -37,7 +49,7 @@ export default function CloneRepositoryPreview() {
       <button type="submit" style={styles.submitButton} disabled={!canPreviewClone}>Preview Clone</button>
       {canPreviewClone ? (
         <div style={styles.clonePreview}>
-          <code>{buildCloneCommand(normalizedRepositoryUrl, normalizedDestinationPath)}</code>
+          <code>{cloneCommand}</code>
           <span>Preview only — cloning requires explicit backend approval.</span>
         </div>
       ) : null}

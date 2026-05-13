@@ -29,7 +29,7 @@ export default function HomePage({ onOpenProject, onQuickStart, projects }: Home
           <button type="button" style={styles.secondaryButton} onClick={() => setShowCloneForm(true)}>Clone Repository</button>
         </div>
         {showManualForm ? <OpenFolderForm onOpenProject={onOpenProject} /> : null}
-        {showCloneForm ? <CloneRepositoryPreview /> : null}
+        {showCloneForm ? <CloneRepositoryPreview onPreviewClone={onQuickStart} /> : null}
         <div style={styles.dropZone}>Drag a project folder here</div>
       </div>
       <div style={styles.grid}>

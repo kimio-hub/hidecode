@@ -51,10 +51,11 @@ describe('HomePage', () => {
     expect(submit).toBeEnabled();
   });
 
-  it('shows clone command preview and preview-only safety text without side effects', () => {
+  it('shows clone command preview and stages a safe chat draft without side effects', () => {
     const onOpenProject = vi.fn();
+    const onQuickStart = vi.fn();
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    render(<HomePage onOpenProject={onOpenProject} />);
+    render(<HomePage onOpenProject={onOpenProject} onQuickStart={onQuickStart} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Clone Repository' }));
     fireEvent.change(screen.getByLabelText('Repository URL'), { target: { value: 'https://example.com/repo.git' } });
@@ -66,6 +67,12 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview Clone' }));
 
     expect(screen.getByText('Clone preview staged — backend approval is required before any network or filesystem action.')).toBeInTheDocument();
+    expect(onQuickStart).toHaveBeenCalledWith({
+      id: 'clone-repository',
+      title: 'Clone repository',
+      description: 'Prepare a backend-approved repository clone request.',
+      prompt: 'Prepare this clone request for backend approval before any network or filesystem action:\n\n`git clone https://example.com/repo.git /tmp/repo`\n\nDo not run the clone until explicit backend approval is granted.',
+    });
     expect(onOpenProject).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();

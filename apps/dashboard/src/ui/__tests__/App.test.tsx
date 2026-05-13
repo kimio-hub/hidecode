@@ -55,6 +55,26 @@ describe('App data loading', () => {
     expect(screen.getByText('Drafted Fix failing tests')).toBeInTheDocument();
   });
 
+  it('switches from clone preview to Chat with a safe clone request draft', async () => {
+    setSearch('?mode=home');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clone Repository' }));
+    fireEvent.change(screen.getByLabelText('Repository URL'), { target: { value: "https://example.com/team's repo.git" } });
+    fireEvent.change(screen.getByLabelText('Destination path'), { target: { value: '/tmp/team repo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Clone' }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getByLabelText('Message hidecode')).toHaveValue(
+      'Prepare this clone request for backend approval before any network or filesystem action:\n\n`git clone \'https://example.com/team\'"\'"\'s repo.git\' \'/tmp/team repo\'`\n\nDo not run the clone until explicit backend approval is granted.',
+    );
+    expect(screen.getByText('Drafted Clone repository')).toBeInTheDocument();
+    const cloneFetchCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('clone'));
+    expect(cloneFetchCalls).toEqual([]);
+  });
+
   it('keeps the selected project context when Quick Start is clicked from an opened project chat', async () => {
     setSearch('');
     const createdAt = '2026-05-12T12:00:00.000Z';
