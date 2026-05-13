@@ -91,7 +91,7 @@ describe('App data loading', () => {
     fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix this' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    await waitFor(() => expect(screen.getByText('scripted run complete')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('scripted run complete').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
 
     expect(screen.getByRole('heading', { name: 'Review real git diff before apply' })).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe('App data loading', () => {
     fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Explain this project' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    await waitFor(() => expect(screen.getByText('scripted run complete')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('scripted run complete').length).toBeGreaterThan(0));
     expect(fetchMock).toHaveBeenCalledWith('/api/projects/open', expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
   });
@@ -215,7 +215,7 @@ describe('App data loading', () => {
     fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Explain this manual project' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    await waitFor(() => expect(screen.getByText('manual project run complete')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('manual project run complete').length).toBeGreaterThan(0));
     expect(fetchMock).toHaveBeenCalledWith('/api/projects/open', expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
   });
@@ -305,7 +305,7 @@ describe('App data loading', () => {
     fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Explain this project' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    await waitFor(() => expect(screen.getByText('custom project run complete')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('custom project run complete').length).toBeGreaterThan(0));
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/projects', expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/api/sessions', expect.any(Object));
   });

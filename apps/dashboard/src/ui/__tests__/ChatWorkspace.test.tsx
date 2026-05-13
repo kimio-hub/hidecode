@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatWorkspace from '../modes/ChatWorkspace';
 
@@ -61,6 +61,105 @@ describe('ChatWorkspace', () => {
 
     expect(screen.getByText('Stop is not wired yet.')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('renders run progress lifecycle states from chat submission', async () => {
+    let resolveMessage: (response: Response) => void = () => {};
+    const messageResponse = new Promise<Response>((resolve) => { resolveMessage = resolve; });
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/sessions') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: {
+              id: 'sess-1',
+              title: 'hidecode session',
+              projectPath: '/repo',
+              messages: [],
+              events: [],
+            },
+          }),
+        } as Response);
+      }
+
+      return messageResponse;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ChatWorkspace />);
+
+    const progress = screen.getByRole('progressbar');
+    const runProgress = screen.getByRole('region', { name: 'Run progress' });
+    expect(progress).toHaveAttribute('aria-valuenow', '0');
+    expect(within(runProgress).getByText('preview')).toBeInTheDocument();
+    expect(screen.getByText(/Runtime output will appear after Run/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix this' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(progress).toHaveAttribute('aria-valuenow', '50'));
+    expect(within(runProgress).getByText('running')).toBeInTheDocument();
+    expect(screen.getAllByText('Running scripted backend session…').length).toBeGreaterThan(0);
+
+    resolveMessage({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        message: { id: 'msg-1', role: 'user', content: 'Fix this', createdAt },
+        run: {
+          ok: true,
+          summary: 'scripted run complete',
+          tracePath: '/repo/.runs/run-1/trace.jsonl',
+          reportPath: '/repo/.runs/run-1/report.md',
+          steps: 1,
+          durationMs: 5,
+        },
+        session: {
+          id: 'sess-1',
+          title: 'hidecode session',
+          projectPath: '/repo',
+          messages: [{ id: 'msg-1', role: 'user', content: 'Fix this', createdAt }],
+          events: [],
+          runs: [],
+        },
+      }),
+    } as Response);
+
+    await waitFor(() => expect(progress).toHaveAttribute('aria-valuenow', '100'));
+    expect(within(runProgress).getByText('completed')).toBeInTheDocument();
+    expect(within(runProgress).getByText('scripted run complete')).toBeInTheDocument();
+  });
+
+  it('renders failed run progress when the backend rejects submission', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === '/api/sessions') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: {
+              id: 'sess-1',
+              title: 'hidecode session',
+              projectPath: '/repo',
+              messages: [],
+              events: [],
+            },
+          }),
+        } as Response);
+      }
+
+      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ChatWorkspace />);
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix this' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    const runProgress = screen.getByRole('region', { name: 'Run progress' });
+    await waitFor(() => expect(within(runProgress).getByText('failed')).toBeInTheDocument());
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+    expect(within(runProgress).getByText('Failed to post message: 500')).toBeInTheDocument();
   });
 
   it('creates a backend session, submits a message, and publishes inspector events', async () => {
@@ -131,7 +230,7 @@ describe('ChatWorkspace', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.objectContaining({ method: 'POST' })));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/sess-1/messages', expect.objectContaining({ method: 'POST' })));
-    await waitFor(() => expect(screen.getByText('scripted run complete')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('scripted run complete').length).toBeGreaterThan(0));
     expect(screen.getByText('Fix this')).toBeInTheDocument();
     expect(onEventsChange).toHaveBeenCalledWith([
       expect.objectContaining({ eventId: 'evt-1', runId: 'run-1', taskId: 'task-1', type: 'tool.requested' }),

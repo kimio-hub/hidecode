@@ -11,7 +11,7 @@ import {
 } from '../../data/backend';
 import MessageComposer from './MessageComposer';
 import MessageList from './MessageList';
-import RunProgress from './RunProgress';
+import RunProgress, { type RunProgressStatus } from './RunProgress';
 
 interface ChatPanelProps {
   onReview?: () => void;
@@ -39,9 +39,11 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       onSessionChange?.(result.session);
       setMessages(sessionMessagesToChatMessages(result.session.messages));
       onEventsChange?.(sessionEventsToTraceEvents(result.session.events));
-      setStatus(result.run?.summary ?? 'Session updated');
+      const summary = result.run?.summary ?? 'Session updated';
+      setStatus(summary);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -54,7 +56,7 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
           <div style={styles.eyebrow}>hidecode session</div>
           <h1 style={styles.title}>Chat with your coding agent</h1>
         </div>
-        <RunProgress />
+        <RunProgress meta={getRunProgressMeta(status)} status={getRunProgressStatus(status, isSubmitting)} />
       </div>
       <div aria-live="polite" style={styles.status}>{status}</div>
       <MessageList messages={messages} />
@@ -67,6 +69,18 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       />
     </section>
   );
+}
+
+function getRunProgressStatus(status: string, isSubmitting: boolean): RunProgressStatus {
+  if (isSubmitting) return 'running';
+  if (status === 'Ready' || status.endsWith('not wired yet.')) return 'preview';
+  if (status.startsWith('Failed to ') || status.toLowerCase().includes('error')) return 'failed';
+  return 'completed';
+}
+
+function getRunProgressMeta(status: string): string | undefined {
+  if (status === 'Ready' || status.endsWith('not wired yet.')) return undefined;
+  return status;
 }
 
 const styles = {
