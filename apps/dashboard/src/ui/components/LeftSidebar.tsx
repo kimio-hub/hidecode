@@ -1,9 +1,22 @@
-export default function LeftSidebar() {
+import type { RecentProject } from '../../data/projects';
+
+interface LeftSidebarProps {
+  selectedProject?: RecentProject | null;
+}
+
+export default function LeftSidebar({ selectedProject }: LeftSidebarProps) {
   return (
     <div style={styles.container}>
       <section>
         <div style={styles.label}>Project</div>
-        <div style={styles.projectCard}>No project selected</div>
+        <div style={styles.projectCard}>
+          {selectedProject ? (
+            <>
+              <div style={styles.projectName}>{selectedProject.name}</div>
+              <div style={styles.projectPath}>{selectedProject.path}</div>
+            </>
+          ) : 'No project selected'}
+        </div>
       </section>
       <section>
         <div style={styles.label}>Sessions</div>
@@ -34,6 +47,16 @@ const styles = {
     color: '#d8dcef',
     background: '#0f1320',
     fontSize: '13px',
+  },
+  projectName: {
+    color: '#ffffff',
+    fontWeight: 800,
+    marginBottom: '4px',
+  },
+  projectPath: {
+    color: '#8b95aa',
+    fontSize: '11px',
+    wordBreak: 'break-all',
   },
   empty: {
     color: '#7f879a',

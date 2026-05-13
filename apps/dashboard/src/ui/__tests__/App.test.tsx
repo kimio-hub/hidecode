@@ -99,6 +99,81 @@ describe('App data loading', () => {
     expect(screen.getByText('real git diff')).toBeInTheDocument();
   });
 
+  it('opens a recent project and creates the next chat session with that project path', async () => {
+    setSearch('');
+    const createdAt = '2026-05-12T09:00:00.000Z';
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/projects/open') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ name: 'hidecode', path: '~/world-harness' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ project: { id: 'hidecode', name: 'hidecode', path: '~/world-harness', openedAt: createdAt } }),
+        } as Response;
+      }
+
+      if (url === '/api/sessions') {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(init?.body as string)).toMatchObject({ projectPath: '~/world-harness', title: 'hidecode session' });
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-project', title: 'hidecode session', projectPath: '~/world-harness', messages: [], events: [] },
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({
+          message: { id: 'msg-project', role: 'user', content: 'Explain this project', createdAt },
+          run: { ok: true, summary: 'scripted run complete', tracePath: '~/world-harness/.runs/run-1/trace.jsonl', reportPath: '~/world-harness/.runs/run-1/report.md', steps: 1, durationMs: 5 },
+          session: {
+            id: 'sess-project',
+            title: 'hidecode session',
+            projectPath: '~/world-harness',
+            messages: [{ id: 'msg-project', role: 'user', content: 'Explain this project', createdAt }],
+            events: [{ id: 'evt-project', sessionId: 'sess-project', type: 'session.created', createdAt, data: { projectPath: '~/world-harness' } }],
+          },
+        }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /hidecode.*~\/world-harness/s }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Chat with your coding agent' })).toBeInTheDocument());
+    expect(screen.getAllByText('hidecode').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/project: ~\/world-harness/).length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Explain this project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(screen.getByText('scripted run complete')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith('/api/projects/open', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', expect.any(Object));
+  });
+
+  it('keeps the user on Home when opening a project fails', async () => {
+    setSearch('');
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'open_failed' }),
+    } as Response)));
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /hidecode.*~\/world-harness/s }));
+
+    await waitFor(() => expect(screen.getByText('Failed to open project: 500')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Build with hidecode' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Chat with your coding agent' })).not.toBeInTheDocument();
+  });
+
   it('loads a run directory from the run query parameter', async () => {
     setSearch('?run=/runs/demo');
     const traceLine = JSON.stringify({

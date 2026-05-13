@@ -6,8 +6,9 @@ interface ChatWorkspaceProps {
   onReview?: () => void;
   onEventsChange?: (events: TraceEvent[]) => void;
   onSessionChange?: (session: BackendSession) => void;
+  projectPath?: string;
 }
 
-export default function ChatWorkspace({ onReview, onEventsChange, onSessionChange }: ChatWorkspaceProps) {
-  return <ChatPanel onEventsChange={onEventsChange} onReview={onReview} onSessionChange={onSessionChange} />;
+export default function ChatWorkspace({ onReview, onEventsChange, onSessionChange, projectPath }: ChatWorkspaceProps) {
+  return <ChatPanel onEventsChange={onEventsChange} onReview={onReview} onSessionChange={onSessionChange} projectPath={projectPath} />;
 }

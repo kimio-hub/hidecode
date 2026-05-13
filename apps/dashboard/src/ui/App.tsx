@@ -19,6 +19,9 @@ import HomePage from './modes/HomePage';
 import ChatWorkspace from './modes/ChatWorkspace';
 import ReviewWorkspace from './modes/ReviewWorkspace';
 import type { BackendSession } from '../data/backend';
+import { getBackendBaseUrl } from '../data/backend';
+import type { RecentProject } from '../data/projects';
+import { openBackendProject } from '../data/projects-backend';
 
 type LoadState =
   | { status: 'ready'; events: TraceEvent[]; run: RunMeta; source: DashboardSource; sourceLabel: string }
@@ -30,6 +33,8 @@ export default function App() {
   const [appSearch, setAppSearch] = useState(window.location.search);
   const [chatEvents, setChatEvents] = useState<TraceEvent[]>([]);
   const [chatSession, setChatSession] = useState<BackendSession | null>(null);
+  const [selectedProject, setSelectedProject] = useState<RecentProject | null>(null);
+  const [projectStatus, setProjectStatus] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
     if (source.kind === 'mock') {
@@ -114,19 +119,38 @@ export default function App() {
     window.history.pushState(null, '', '?mode=review');
     setAppSearch('?mode=review');
   };
+  const openProject = async (project: RecentProject) => {
+    setSelectedProject(null);
+    setProjectStatus(`Opening ${project.name}…`);
+    try {
+      const openedProject = await openBackendProject(project, getBackendBaseUrl());
+      setSelectedProject({
+        id: openedProject.id,
+        name: openedProject.name,
+        path: openedProject.path,
+        description: project.description,
+        lastOpened: 'Just now',
+      });
+      setProjectStatus(null);
+      window.history.pushState(null, '', '?mode=chat');
+      setAppSearch('?mode=chat');
+    } catch (error) {
+      setProjectStatus(error instanceof Error ? error.message : String(error));
+    }
+  };
   const workspace = appState.mode === 'review'
     ? <ReviewWorkspace session={chatSession} />
     : appState.mode === 'chat'
-      ? <ChatWorkspace onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} />
-      : <HomePage />;
+      ? <ChatWorkspace onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} projectPath={selectedProject?.path} />
+      : <HomePage onOpenProject={openProject} />;
 
   return (
     <div style={{ background: '#070a12', minHeight: '100vh' }}>
       <AppShell
-        sidebar={<LeftSidebar />}
+        sidebar={<LeftSidebar selectedProject={selectedProject} />}
         workspace={workspace}
         inspector={<RightInspector events={shellEvents} />}
-        status={<BottomStatusBar />}
+        status={<BottomStatusBar selectedProject={selectedProject} projectStatus={projectStatus} />}
       />
     </div>
   );

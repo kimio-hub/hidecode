@@ -1,8 +1,13 @@
 import ModelSafetySetup from '../components/ModelSafetySetup';
 import QuickStartPanel from '../components/QuickStartPanel';
 import RecentProjectsPanel from '../components/RecentProjectsPanel';
+import type { RecentProject } from '../../data/projects';
 
-export default function HomePage() {
+interface HomePageProps {
+  onOpenProject?: (project: RecentProject) => void;
+}
+
+export default function HomePage({ onOpenProject }: HomePageProps) {
   return (
     <div style={styles.page}>
       <div style={styles.hero}>
@@ -18,7 +23,7 @@ export default function HomePage() {
         <div style={styles.dropZone}>Drag a project folder here</div>
       </div>
       <div style={styles.grid}>
-        <RecentProjectsPanel />
+        <RecentProjectsPanel onOpenProject={onOpenProject} />
         <div style={styles.sideStack}>
           <QuickStartPanel />
           <ModelSafetySetup />

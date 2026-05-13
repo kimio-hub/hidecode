@@ -1,12 +1,21 @@
-import { recentProjects } from '../../data/projects';
+import { recentProjects, type RecentProject } from '../../data/projects';
 
-export default function RecentProjectsPanel() {
+interface RecentProjectsPanelProps {
+  onOpenProject?: (project: RecentProject) => void;
+}
+
+export default function RecentProjectsPanel({ onOpenProject }: RecentProjectsPanelProps) {
   return (
     <section aria-label="Recent projects" style={styles.panel}>
       <div style={styles.heading}>Recent Projects</div>
       <div style={styles.list}>
         {recentProjects.map((project) => (
-          <button key={project.id} type="button" style={styles.projectCard}>
+          <button
+            key={project.id}
+            type="button"
+            style={styles.projectCard}
+            onClick={() => onOpenProject?.(project)}
+          >
             <span style={styles.projectName}>{project.name}</span>
             <span style={styles.projectPath}>{project.path}</span>
             <span style={styles.projectDescription}>{project.description}</span>
