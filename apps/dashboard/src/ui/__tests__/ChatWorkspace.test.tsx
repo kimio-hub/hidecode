@@ -163,6 +163,29 @@ describe('ChatWorkspace', () => {
     expect(within(runProgress).getByText('Failed to post message: 500')).toBeInTheDocument();
   });
 
+  it('keeps composer content when backend submission fails so the user can retry', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/sessions') {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-retry', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+          }),
+        } as Response;
+      }
+
+      return { ok: false, status: 500, json: async () => ({}) } as Response;
+    }));
+
+    render(<ChatWorkspace />);
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix but keep my draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(screen.getAllByText('Failed to post message: 500').length).toBeGreaterThan(0));
+    expect(screen.getByLabelText('Message hidecode')).toHaveValue('Fix but keep my draft');
+  });
+
   it('continues a loaded backend session instead of creating a new one', async () => {
     const onSessionChange = vi.fn();
     const fetchMock = vi.fn(async (url: string) => {

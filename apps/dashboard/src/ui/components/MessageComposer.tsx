@@ -4,7 +4,7 @@ interface MessageComposerProps {
   onPlan?: () => void;
   onReview?: () => void;
   onStop?: () => void;
-  onSubmitMessage?: (content: string) => Promise<void> | void;
+  onSubmitMessage?: (content: string) => Promise<boolean | void> | boolean | void;
   disabled?: boolean;
   initialContent?: string;
 }
@@ -20,8 +20,8 @@ export default function MessageComposer({ onPlan, onReview, onStop, onSubmitMess
     event.preventDefault();
     const trimmed = content.trim();
     if (!trimmed || disabled) return;
-    await onSubmitMessage?.(trimmed);
-    setContent('');
+    const result = await onSubmitMessage?.(trimmed);
+    if (result !== false) setContent('');
   }
 
   return (

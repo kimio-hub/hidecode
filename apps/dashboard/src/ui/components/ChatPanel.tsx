@@ -51,7 +51,7 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
     };
   }, []);
 
-  async function handleSubmitMessage(content: string) {
+  async function handleSubmitMessage(content: string): Promise<boolean> {
     const submitToken = submitTokenRef.current + 1;
     submitTokenRef.current = submitToken;
     const isCurrentSubmit = () => mountedRef.current && submitTokenRef.current === submitToken;
@@ -61,14 +61,14 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
     try {
       const baseUrl = getBackendBaseUrl();
       const activeSession = session ?? await createBackendSession(projectPath, baseUrl);
-      if (!isCurrentSubmit()) return;
+      if (!isCurrentSubmit()) return false;
       setSession(activeSession);
       onSessionChange?.(activeSession);
       stopPollingRef.current();
       stopPolling = startSessionEventPolling(activeSession.id, baseUrl, onEventsChange);
       stopPollingRef.current = stopPolling;
       const result = await postBackendMessage(activeSession.id, content, baseUrl);
-      if (!isCurrentSubmit()) return;
+      if (!isCurrentSubmit()) return false;
       const updatedSession = sessionWithReturnedRun(result);
       setSession(updatedSession);
       onSessionChange?.(updatedSession);
@@ -76,10 +76,12 @@ export default function ChatPanel({ onReview, onEventsChange, onSessionChange, p
       onEventsChange?.(sessionEventsToTraceEvents(updatedSession.events));
       const summary = result.run?.summary ?? 'Session updated';
       setStatus(summary);
+      return true;
     } catch (error) {
-      if (!isCurrentSubmit()) return;
+      if (!isCurrentSubmit()) return false;
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
+      return false;
     } finally {
       stopPolling();
       if (stopPollingRef.current === stopPolling) stopPollingRef.current = () => {};
