@@ -34,6 +34,32 @@ export interface BackendSession {
   messages: BackendSessionMessage[];
   events: BackendSessionEvent[];
   runs?: BackendSessionRun[];
+  review?: BackendSessionReview;
+}
+
+export interface BackendSessionReview {
+  summary: {
+    fileCount: number;
+    additions: number;
+    deletions: number;
+    byStatus: Record<'added' | 'modified' | 'deleted' | 'renamed', number>;
+  };
+  changedFiles: Array<{
+    path: string;
+    oldPath?: string;
+    language?: string;
+    additions: number;
+    deletions: number;
+    status: 'added' | 'modified' | 'deleted' | 'renamed';
+  }>;
+  diffs: Array<{ filePath: string; oldPath?: string; patch: string }>;
+  approval: {
+    id: string;
+    title: string;
+    status: 'pending' | 'approved' | 'rejected';
+    risk: 'low' | 'medium' | 'high' | 'critical';
+    policyExplanation: string;
+  };
 }
 
 export interface BackendCreateSessionResponse {

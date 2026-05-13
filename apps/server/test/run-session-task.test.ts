@@ -1,10 +1,16 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createServer } from '../src/index.js';
 import { buildSessionTask, runSessionTask } from '../src/runtime/run-session-task.js';
+
+async function git(args: string[]) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  return promisify(execFile)('git', args, { cwd: rootDir });
+}
 
 let rootDir: string;
 
@@ -55,8 +61,37 @@ describe('chat to orchestrator bridge', () => {
       'model.requested',
       'task.completed',
       'runtime.task.finished',
+      'approval.requested',
     ]));
     expect(result.run.tracePath).toContain('.runs');
+  });
+
+  it('captures a review diff and approval request after the session runtime finishes', async () => {
+    await git(['init']);
+    await git(['config', 'user.email', 'test@example.com']);
+    await git(['config', 'user.name', 'Test User']);
+    await writeFile(join(rootDir, 'tracked.ts'), 'export const before = 1;\n');
+    await git(['add', 'tracked.ts']);
+    await git(['commit', '-m', 'initial']);
+    await writeFile(join(rootDir, 'tracked.ts'), 'export const after = 2;\n');
+
+    const result = await runSessionTask({
+      sessionId: 'sess_abc_123',
+      projectPath: rootDir,
+      message: 'Inspect changed files safely',
+      model: 'scripted',
+      maxSteps: 3,
+    });
+
+    expect(result.review).toMatchObject({
+      approval: expect.objectContaining({ status: 'pending', risk: 'medium' }),
+      summary: expect.objectContaining({ fileCount: 1, additions: 1, deletions: 1 }),
+      changedFiles: [expect.objectContaining({ path: 'tracked.ts', status: 'modified' })],
+    });
+    expect(result.review?.diffs[0]).toMatchObject({ filePath: 'tracked.ts', patch: expect.stringContaining('export const after = 2;') });
+    expect(result.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'approval.requested', data: expect.objectContaining({ fileCount: 1 }) }),
+    ]));
   });
 
   it('starts a runtime task when a chat message is posted and streams events as SSE', async () => {
@@ -80,6 +115,7 @@ describe('chat to orchestrator bridge', () => {
     expect(messageBody.run).toMatchObject({ ok: true, summary: 'session task completed' });
     expect(messageBody.session).toMatchObject({
       runs: [expect.objectContaining({ ok: true, summary: 'session task completed' })],
+      review: expect.objectContaining({ approval: expect.objectContaining({ status: 'pending' }) }),
     });
 
     const eventsResponse = await server.fetch(new Request(`http://localhost/api/sessions/${sessionId}/events`));
@@ -92,6 +128,7 @@ describe('chat to orchestrator bridge', () => {
       'task.created',
       'task.completed',
       'runtime.task.finished',
+      'approval.requested',
     ]));
 
     const streamResponse = await server.fetch(new Request(`http://localhost/api/sessions/${sessionId}/stream`));

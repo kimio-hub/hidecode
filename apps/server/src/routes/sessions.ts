@@ -30,6 +30,34 @@ export interface SessionRecord {
   messages: SessionMessage[];
   events: SessionEvent[];
   runs?: SessionRun[];
+  review?: SessionReview;
+}
+
+export interface SessionReviewApproval {
+  id: string;
+  title: string;
+  status: 'pending' | 'approved' | 'rejected';
+  risk: 'low' | 'medium' | 'high' | 'critical';
+  policyExplanation: string;
+}
+
+export interface SessionReview {
+  summary: {
+    fileCount: number;
+    additions: number;
+    deletions: number;
+    byStatus: Record<'added' | 'modified' | 'deleted' | 'renamed', number>;
+  };
+  changedFiles: Array<{
+    path: string;
+    oldPath?: string;
+    language?: string;
+    additions: number;
+    deletions: number;
+    status: 'added' | 'modified' | 'deleted' | 'renamed';
+  }>;
+  diffs: Array<{ filePath: string; oldPath?: string; patch: string }>;
+  approval: SessionReviewApproval;
 }
 
 export interface SessionRun {
@@ -112,6 +140,7 @@ export async function handleCreateMessage(store: JsonStore, sessionId: string, r
     runtimeResult = await runSessionTask(runtimeOptions);
     session.events.push(...runtimeResult.events);
     session.runs = [...(session.runs ?? []), toSessionRun(runtimeResult.run)];
+    session.review = runtimeResult.review;
     session.updatedAt = new Date().toISOString();
   } catch (error) {
     session.events.push(makeEvent(session.id, 'runtime.task.failed', {

@@ -16,10 +16,11 @@ import RunProgress from './RunProgress';
 interface ChatPanelProps {
   onReview?: () => void;
   onEventsChange?: (events: TraceEvent[]) => void;
+  onSessionChange?: (session: BackendSession) => void;
   projectPath?: string;
 }
 
-export default function ChatPanel({ onReview, onEventsChange, projectPath = '' }: ChatPanelProps) {
+export default function ChatPanel({ onReview, onEventsChange, onSessionChange, projectPath = '' }: ChatPanelProps) {
   const [session, setSession] = useState<BackendSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
   const [status, setStatus] = useState('Ready');
@@ -32,8 +33,10 @@ export default function ChatPanel({ onReview, onEventsChange, projectPath = '' }
       const baseUrl = getBackendBaseUrl();
       const activeSession = session ?? await createBackendSession(projectPath, baseUrl);
       setSession(activeSession);
+      onSessionChange?.(activeSession);
       const result = await postBackendMessage(activeSession.id, content, baseUrl);
       setSession(result.session);
+      onSessionChange?.(result.session);
       setMessages(sessionMessagesToChatMessages(result.session.messages));
       onEventsChange?.(sessionEventsToTraceEvents(result.session.events));
       setStatus(result.run?.summary ?? 'Session updated');

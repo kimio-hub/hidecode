@@ -1,6 +1,8 @@
 import { cp, mkdir, rm, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+export * from './diff.js';
+
 export type WorkspaceCheckpoint = { checkpointId: string; path: string };
 
 export async function createCheckpoint(repo: string, runId: string): Promise<WorkspaceCheckpoint> {

@@ -130,6 +130,9 @@ importers:
       '@world-harness/tools':
         specifier: workspace:*
         version: link:../../packages/tools
+      '@world-harness/workspace':
+        specifier: workspace:*
+        version: link:../../packages/workspace
 
   packages/core:
     dependencies:

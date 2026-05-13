@@ -44,6 +44,61 @@ describe('App data loading', () => {
     expect(screen.getByRole('heading', { name: 'Review proposed changes' })).toBeInTheDocument();
   });
 
+  it('carries backend session review from chat into review mode', async () => {
+    setSearch('?mode=chat');
+    const createdAt = '2026-05-11T22:00:00.000Z';
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/sessions') {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            session: { id: 'sess-1', title: 'hidecode session', projectPath: '/repo', messages: [], events: [] },
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({
+          message: { id: 'msg-1', role: 'user', content: 'Fix this', createdAt },
+          run: { ok: true, summary: 'scripted run complete', tracePath: '/repo/.runs/run-1/trace.jsonl', reportPath: '/repo/.runs/run-1/report.md', steps: 1, durationMs: 5 },
+          session: {
+            id: 'sess-1',
+            title: 'hidecode session',
+            projectPath: '/repo',
+            messages: [{ id: 'msg-1', role: 'user', content: 'Fix this', createdAt }],
+            events: [],
+            review: {
+              summary: { fileCount: 1, additions: 2, deletions: 1, byStatus: { added: 0, modified: 1, deleted: 0, renamed: 0 } },
+              changedFiles: [{ path: 'src/app.ts', language: 'ts', additions: 2, deletions: 1, status: 'modified' }],
+              diffs: [{ filePath: 'src/app.ts', patch: 'diff --git a/src/app.ts b/src/app.ts\n-old\n+new' }],
+              approval: {
+                id: 'approval_sess-1',
+                title: 'Review real git diff before apply',
+                status: 'pending',
+                risk: 'medium',
+                policyExplanation: 'Real git diff captured from the selected project. Approve/reject is audit-only.',
+              },
+            },
+          },
+        }),
+      } as Response;
+    }));
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix this' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(screen.getByText('scripted run complete')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+
+    expect(screen.getByRole('heading', { name: 'Review real git diff before apply' })).toBeInTheDocument();
+    expect(screen.getAllByText('src/app.ts').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('real git diff')).toBeInTheDocument();
+  });
+
   it('loads a run directory from the run query parameter', async () => {
     setSearch('?run=/runs/demo');
     const traceLine = JSON.stringify({

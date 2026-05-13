@@ -16,7 +16,8 @@
     "@world-harness/models": "workspace:*",
     "@world-harness/orchestrator": "workspace:*",
     "@world-harness/policy": "workspace:*",
-    "@world-harness/tools": "workspace:*"
+    "@world-harness/tools": "workspace:*",
+    "@world-harness/workspace": "workspace:*"
   },
   "exports": {
     "./src/index.js": "./src/index.ts",

@@ -1,9 +1,15 @@
-import { buildMockReviewState } from '../../data/review';
+import { buildMockReviewState, buildReviewStateFromBackendSession } from '../../data/review';
+import type { BackendSession } from '../../data/backend';
 import ChangedFilesList from '../components/ChangedFilesList';
 import CommandPreview from '../components/CommandPreview';
 
-export default function ReviewWorkspace() {
-  const review = buildMockReviewState();
+interface ReviewWorkspaceProps {
+  session?: BackendSession | null;
+}
+
+export default function ReviewWorkspace({ session }: ReviewWorkspaceProps = {}) {
+  const review = session ? buildReviewStateFromBackendSession(session) : buildMockReviewState();
+  const diffBadge = review.source === 'backend' ? 'real git diff' : 'mock side-by-side diff preview';
 
   return (
     <section aria-label="Review workspace" style={styles.workspace}>
@@ -33,7 +39,7 @@ export default function ReviewWorkspace() {
                 <div style={styles.panelHeader}>Side-by-side diff</div>
                 <div style={styles.filePath}>{review.diff.filePath}</div>
               </div>
-              <span style={styles.mockBadge}>mock side-by-side diff preview</span>
+              <span style={styles.mockBadge}>{diffBadge}</span>
             </div>
             <div style={styles.diffGrid}>
               <DiffColumn title="Before" content={review.diff.before} />

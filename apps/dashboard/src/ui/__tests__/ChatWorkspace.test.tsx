@@ -37,6 +37,7 @@ describe('ChatWorkspace', () => {
 
   it('creates a backend session, submits a message, and publishes inspector events', async () => {
     const onEventsChange = vi.fn();
+    const onSessionChange = vi.fn();
     const fetchMock = vi.fn(async (url: string) => {
       if (url === '/api/sessions') {
         return {
@@ -95,7 +96,7 @@ describe('ChatWorkspace', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<ChatWorkspace onEventsChange={onEventsChange} />);
+    render(<ChatWorkspace onEventsChange={onEventsChange} onSessionChange={onSessionChange} />);
 
     fireEvent.change(screen.getByLabelText('Message hidecode'), { target: { value: 'Fix this' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
@@ -107,5 +108,9 @@ describe('ChatWorkspace', () => {
     expect(onEventsChange).toHaveBeenCalledWith([
       expect.objectContaining({ eventId: 'evt-1', runId: 'run-1', taskId: 'task-1', type: 'tool.requested' }),
     ]);
+    expect(onSessionChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'sess-1',
+      runs: [expect.objectContaining({ id: 'run-1' })],
+    }));
   });
 });

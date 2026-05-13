@@ -41,6 +41,17 @@ export interface ReviewWorkspaceState {
   diff: ReviewDiffPreview;
   approval: ReviewApprovalCard;
   command: ReviewCommandPreview;
+  source: 'mock' | 'backend';
+}
+
+interface BackendReviewSession {
+  projectPath: string;
+  review?: {
+    summary: ChangedFilesSummary;
+    changedFiles: ChangedFileSummary[];
+    diffs: Array<{ filePath: string; patch: string }>;
+    approval: ReviewApprovalCard;
+  };
 }
 
 export function summarizeChangedFiles(files: ChangedFileSummary[]): ChangedFilesSummary {
@@ -110,5 +121,40 @@ export function buildMockReviewState(): ReviewWorkspaceState {
       risk: 'low',
       explanation: 'Runs the dashboard test suite before any proposed UI changes can be accepted.',
     },
+    source: 'mock',
   };
+}
+
+export function buildReviewStateFromBackendSession(session: BackendReviewSession, fallback = buildMockReviewState()): ReviewWorkspaceState {
+  if (!session.review) return fallback;
+  const selectedFile = session.review.changedFiles[0] ?? {
+    path: 'No file changes',
+    additions: 0,
+    deletions: 0,
+    status: 'modified' as const,
+  };
+  const firstDiff = session.review.diffs.find((diff) => diff.filePath === selectedFile.path) ?? session.review.diffs[0];
+  return {
+    title: session.review.approval.title,
+    summary: session.review.summary,
+    changedFiles: session.review.changedFiles,
+    selectedFile,
+    diff: diffPreviewFromPatch(firstDiff, selectedFile.path),
+    approval: session.review.approval,
+    command: {
+      command: 'git diff HEAD --patch',
+      cwd: session.projectPath,
+      risk: session.review.approval.risk,
+      explanation: 'Captured from the selected project worktree. Approval/rejection is audit-only in this milestone.',
+    },
+    source: 'backend',
+  };
+}
+
+function diffPreviewFromPatch(diff: { filePath: string; patch: string } | undefined, filePath: string): ReviewDiffPreview {
+  if (!diff) return { filePath, before: 'No diff captured.', after: 'No diff captured.' };
+  const lines = diff.patch.split('\n');
+  const before = lines.filter((line) => line.startsWith('-') && !line.startsWith('---')).join('\n') || 'No removed lines.';
+  const after = lines.filter((line) => line.startsWith('+') && !line.startsWith('+++')).join('\n') || 'No added lines.';
+  return { filePath: diff.filePath, before, after };
 }

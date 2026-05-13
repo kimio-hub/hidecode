@@ -18,6 +18,7 @@ import RightInspector from './components/RightInspector';
 import HomePage from './modes/HomePage';
 import ChatWorkspace from './modes/ChatWorkspace';
 import ReviewWorkspace from './modes/ReviewWorkspace';
+import type { BackendSession } from '../data/backend';
 
 type LoadState =
   | { status: 'ready'; events: TraceEvent[]; run: RunMeta; source: DashboardSource; sourceLabel: string }
@@ -28,6 +29,7 @@ export default function App() {
   const source = useMemo(() => parseDashboardSource(window.location.search), []);
   const [appSearch, setAppSearch] = useState(window.location.search);
   const [chatEvents, setChatEvents] = useState<TraceEvent[]>([]);
+  const [chatSession, setChatSession] = useState<BackendSession | null>(null);
   const [state, setState] = useState<LoadState>(() => {
     const sourceLabel = describeDashboardSource(source);
     if (source.kind === 'mock') {
@@ -113,9 +115,9 @@ export default function App() {
     setAppSearch('?mode=review');
   };
   const workspace = appState.mode === 'review'
-    ? <ReviewWorkspace />
+    ? <ReviewWorkspace session={chatSession} />
     : appState.mode === 'chat'
-      ? <ChatWorkspace onEventsChange={setChatEvents} onReview={navigateToReview} />
+      ? <ChatWorkspace onEventsChange={setChatEvents} onSessionChange={setChatSession} onReview={navigateToReview} />
       : <HomePage />;
 
   return (
